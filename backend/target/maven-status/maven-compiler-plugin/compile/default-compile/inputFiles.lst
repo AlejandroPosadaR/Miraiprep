@@ -1,0 +1,12 @@
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/AimockApplication.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/TestController.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/auth/AuthController.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/auth/dto/AuthResponse.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/auth/dto/LoginRequest.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/auth/dto/RegisterRequest.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/auth/jwt/JwtAuthFilter.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/auth/jwt/JwtService.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/auth/user/User.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/auth/user/UserRepository.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/auth/user/UserService.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/config/SecurityConfig.java
