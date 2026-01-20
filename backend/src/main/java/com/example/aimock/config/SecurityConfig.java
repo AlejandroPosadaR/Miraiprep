@@ -42,7 +42,11 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/api/auth/register",
                                 "/api/public/**",
-                                "/error"
+                                "/error",
+                                // OpenAPI/Swagger endpoints
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
                         ).permitAll()
                         // All other endpoints require authentication
                         .anyRequest().authenticated()

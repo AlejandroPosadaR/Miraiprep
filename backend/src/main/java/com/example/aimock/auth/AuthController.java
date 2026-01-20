@@ -39,7 +39,7 @@ public class AuthController {
                 User user = userRepository.findByEmail(request.getEmail())
                         .orElseThrow(() -> new RuntimeException("User not found"));
                 
-                String token = jwtService.generateToken(request.getEmail());
+                String token = jwtService.generateToken(user.getId(), request.getEmail());
                 
                 return ResponseEntity.ok(AuthResponse.builder()
                         .token(token)
@@ -88,10 +88,11 @@ public class AuthController {
         userRepository.save(user);
 
         // Generate token
-        String token = jwtService.generateToken(user.getEmail());
+        String token = jwtService.generateToken(user.getId(), user.getEmail());
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(AuthResponse.builder()
+                        .userId(user.getId())
                         .token(token)
                         .email(user.getEmail())
                         .username(user.getUsername())
@@ -112,6 +113,7 @@ public class AuthController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return ResponseEntity.ok(AuthResponse.builder()
+                .userId(user.getId())
                 .email(user.getEmail())
                 .username(user.getUsername())
                 .firstName(user.getFirstName())
