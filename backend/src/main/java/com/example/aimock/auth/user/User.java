@@ -1,6 +1,7 @@
 package com.example.aimock.auth.user;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,18 +26,19 @@ public class User {
     private UUID id;
 
     @Column(nullable = false, unique = true)
+    @Email(message = "Invalid email format", regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")
     private String email;
 
     @Column(nullable = false)
     private String password;
 
-    @Column(name = "username", nullable = false)
+    @Column(name = "username", nullable = false, length = 100)
     private String username;
 
-    @Column(name = "first_name", nullable = false)
+    @Column(name = "first_name", nullable = false, length = 100)
     private String firstName;
 
-    @Column(name = "last_name", nullable = false)
+    @Column(name = "last_name", nullable = false, length = 100)
     private String lastName;
 
     @Column(name = "phone_number")

@@ -4,8 +4,11 @@ import com.example.aimock.auth.dto.AuthResponse;
 import com.example.aimock.auth.dto.LoginRequest;
 import com.example.aimock.auth.dto.RegisterRequest;
 import com.example.aimock.auth.jwt.JwtService;
+import com.example.aimock.auth.user.AuthUser;
 import com.example.aimock.auth.user.User;
 import com.example.aimock.auth.user.UserRepository;
+import com.example.aimock.exception.ConflictException;
+import com.example.aimock.exception.UnauthorizedException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -14,6 +17,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,12 +41,13 @@ public class AuthController {
 
             if (authentication.isAuthenticated()) {
                 User user = userRepository.findByEmail(request.getEmail())
-                        .orElseThrow(() -> new RuntimeException("User not found"));
+                        .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
                 
                 String token = jwtService.generateToken(user.getId(), request.getEmail());
                 
                 return ResponseEntity.ok(AuthResponse.builder()
                         .token(token)
+                        .userId(user.getId())
                         .email(user.getEmail())
                         .username(user.getUsername())
                         .firstName(user.getFirstName())
@@ -51,12 +56,10 @@ public class AuthController {
                         .build());
             }
             
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(AuthResponse.builder().message("Authentication failed").build());
+            throw new UnauthorizedException("Authentication failed");
                     
         } catch (BadCredentialsException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(AuthResponse.builder().message("Invalid email or password").build());
+            throw new UnauthorizedException("Invalid email or password");
         }
     }
 
@@ -64,14 +67,12 @@ public class AuthController {
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         // Check if email already exists
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(AuthResponse.builder().message("Email already registered").build());
+            throw new ConflictException("User", "email", request.getEmail());
         }
 
         // Check if username already exists
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(AuthResponse.builder().message("Username already taken").build());
+            throw new ConflictException("User", "username", request.getUsername());
         }
 
         // Create new user
@@ -103,21 +104,13 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<AuthResponse> getCurrentUser(Authentication authentication) {
-        if (authentication == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(AuthResponse.builder().message("Not authenticated").build());
-        }
-
-        User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
+    public ResponseEntity<AuthResponse> getCurrentUser(@AuthenticationPrincipal AuthUser authUser) {
         return ResponseEntity.ok(AuthResponse.builder()
-                .userId(user.getId())
-                .email(user.getEmail())
-                .username(user.getUsername())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
+                .userId(authUser.getUserId())
+                .email(authUser.getEmail())
+                .username(authUser.getUsername())
+                .firstName(authUser.getFirstName())
+                .lastName(authUser.getLastName())
                 .build());
     }
 }

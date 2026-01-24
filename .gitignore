@@ -32,6 +32,14 @@ replay_pid*
 # Maven
 target/
 
+# Test results & reports
+**/surefire-reports/
+**/test-output/
+**/test-results/
+*.dump
+*.dumpstream
+**/.surefire/
+
 frontend/node_modules/
 
 AUTHENTICATION_EXPLANATION.md

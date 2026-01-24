@@ -2,10 +2,11 @@
 CREATE TABLE messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL,
-    role VARCHAR(20) NOT NULL, -- 'USER' or 'AI'
+    role VARCHAR(20) NOT NULL, -- 'USER' or 'INTERVIEWER'
     content TEXT NOT NULL,
+    message_status VARCHAR(20) NOT NULL,
     audio_url VARCHAR(500), -- Optional: URL to audio file if voice was used
-    sequence_number INTEGER NOT NULL, -- Order of message in conversation
+    sequence_number BIGINT NOT NULL, -- Order of message in conversation
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT fk_messages_session 
@@ -14,7 +15,7 @@ CREATE TABLE messages (
         ON DELETE CASCADE,
     
     CONSTRAINT chk_messages_role 
-        CHECK (role IN ('USER', 'AI'))
+        CHECK (role IN ('USER', 'INTERVIEWER'))
 );
 
 -- Create indexes
