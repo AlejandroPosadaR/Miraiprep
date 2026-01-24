@@ -1,5 +1,6 @@
 package com.example.aimock.auth.jwt;
 
+import com.example.aimock.exception.UnauthorizedException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -73,6 +74,9 @@ public class JwtService {
 
     public Boolean validateToken(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+        if (isTokenExpired(token)) {
+            throw new UnauthorizedException("Token expired");
+        }
+        return (username.equals(userDetails.getUsername()));
     }
 }
