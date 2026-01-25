@@ -2,13 +2,14 @@ package com.example.aimock.messages;
 
 import com.example.aimock.messages.model.Message;
 import com.example.aimock.messages.model.MessageRole;
-import com.example.aimock.messages.model.MessageStatus;
+import com.example.aimock.session.InterviewSessionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.UUID;
@@ -23,13 +24,22 @@ class MessageServiceTest {
     @Mock
     private MessageRepository messageRepository;
 
+    @Mock
+    private InterviewSessionRepository sessionRepository;
+
+    @Mock
+    private SQSService sqsService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private MessageService messageService;
 
     private UUID sessionId;
 
     @BeforeEach
     void setUp() {
-        messageService = new MessageService(messageRepository);
+        messageService = new MessageService(messageRepository, sessionRepository, sqsService, eventPublisher);
         sessionId = UUID.randomUUID();
     }
 

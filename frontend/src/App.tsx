@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import Pricing from "./pages/Pricing";
 import InterviewDemo from "./pages/InterviewDemo";
+import Interview from "./pages/Interview";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -59,7 +60,17 @@ function AppRoutes() {
       <Route path="/" element={<Index />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/interview-demo" element={<InterviewDemo />} />
-      
+
+      {/* Protected: live interview (uses backend session + WebSocket) */}
+      <Route
+        path="/interview/:sessionId"
+        element={
+          <ProtectedRoute>
+            <Interview />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Auth routes */}
       <Route
         path="/login"

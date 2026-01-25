@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { api, AuthResponse } from '@/services/api';
 
-interface User {
+export interface User {
+  userId?: string;
   email: string;
   username: string;
   firstName: string;
@@ -30,23 +31,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session on mount
-    const storedUser = api.getStoredUser();
-    if (storedUser && api.isAuthenticated()) {
-      setUser(storedUser);
+    const stored = api.getStoredUser();
+    if (stored && api.isAuthenticated()) {
+      setUser({
+        userId: stored.userId,
+        email: stored.email,
+        username: stored.username,
+        firstName: stored.firstName,
+        lastName: stored.lastName,
+      });
     }
     setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await api.login({ email, password });
+    const res = await api.login({ email, password });
     setUser({
-      email: response.email,
-      username: response.username,
-      firstName: response.firstName,
-      lastName: response.lastName,
+      userId: res.userId as string,
+      email: res.email,
+      username: res.username,
+      firstName: res.firstName,
+      lastName: res.lastName,
     });
-    return response;
+    return res;
   };
 
   const register = async (data: {
@@ -56,14 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     firstName: string;
     lastName: string;
   }) => {
-    const response = await api.register(data);
+    const res = await api.register(data);
     setUser({
-      email: response.email,
-      username: response.username,
-      firstName: response.firstName,
-      lastName: response.lastName,
+      userId: res.userId as string,
+      email: res.email,
+      username: res.username,
+      firstName: res.firstName,
+      lastName: res.lastName,
     });
-    return response;
+    return res;
   };
 
   const logout = () => {
@@ -88,10 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (ctx === undefined) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 }
-

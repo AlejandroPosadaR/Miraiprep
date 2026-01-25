@@ -255,14 +255,7 @@ export default function Register() {
           </form>
 
           <p className="text-center text-sm text-muted-foreground">
-            By creating an account, you agree to our{' '}
-            <Link to="/terms" className="text-primary hover:underline">
-              Terms of Service
-            </Link>{' '}
-            and{' '}
-            <Link to="/privacy" className="text-primary hover:underline">
-              Privacy Policy
-            </Link>
+            By creating an account, you agree to our Terms of Service and Privacy Policy.
           </p>
 
           <div className="relative">
