@@ -1,5 +1,10 @@
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/AimockApplication.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/TestController.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/ai/AIChatService.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/ai/AIMessageProcessor.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/ai/consumer/SQSMessageConsumer.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/ai/dto/AIProcessingRequest.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/ai/dto/AIProcessingResult.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/auth/AuthController.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/auth/dto/AuthResponse.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/auth/dto/LoginRequest.java
@@ -23,6 +28,12 @@
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/messages/MessageController.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/messages/MessageRepository.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/messages/MessageService.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/messages/NoOpSQSService.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/messages/RealSQSService.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/messages/SQSService.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/messages/dto/MessageCreationResult.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/messages/events/AiJobRequestedEvent.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/messages/events/AiJobRequestedListener.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/messages/model/Message.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/messages/model/MessageRole.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/messages/model/MessageStatus.java
@@ -33,3 +44,10 @@
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/session/Status.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/session/dto/CreateInterviewSessionRequest.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/session/dto/InterviewSessionResponse.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/sqs/SqsClientConfig.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/sqs/SqsPollingListener.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/websocket/InterviewStompController.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/websocket/SessionTopicPublisher.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/websocket/WebSocketConfig.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/websocket/dto/InterviewMessageRequest.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/websocket/dto/SessionTopicEvent.java

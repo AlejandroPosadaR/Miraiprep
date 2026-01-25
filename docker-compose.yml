@@ -23,8 +23,18 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: aimock-backend
+    env_file:
+      - .env
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      SPRING_AI_OPENAI_API_KEY: ${SPRING_AI_OPENAI_API_KEY}
+      # SQS queue URL (required when app.sqs.enabled=true)
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL}
+      # AWS SDK will use these standard env vars if set
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
     ports:
       - "8080:8080"
     depends_on:

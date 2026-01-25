@@ -41,5 +41,9 @@ target/
 **/.surefire/
 
 frontend/node_modules/
+frontend/dist/
+frontend/build/
 
 AUTHENTICATION_EXPLANATION.md
+
+.env

@@ -43,6 +43,8 @@ public class SecurityConfig {
                                 "/api/auth/register",
                                 "/api/public/**",
                                 "/error",
+                                // WebSocket STOMP endpoint (auth can be enforced in handshake/controller)
+                                "/ws", "/ws/**",
                                 // OpenAPI/Swagger endpoints
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
