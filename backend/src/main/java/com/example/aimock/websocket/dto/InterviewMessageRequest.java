@@ -22,6 +22,5 @@ public class InterviewMessageRequest {
     @NotBlank
     private String content;
 
-    /** Optional idempotency key to avoid duplicate processing. */
     private String idempotencyKey;
 }

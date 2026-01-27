@@ -7,12 +7,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
-/**
- * No-op SQS service for local development.
- * 
- * Optionally processes messages synchronously for local testing.
- * Set app.sqs.process-locally=true to enable immediate processing.
- */
 @Service
 @Primary
 @ConditionalOnProperty(name = "app.sqs.enabled", havingValue = "false", matchIfMissing = true)

@@ -4,9 +4,6 @@ import com.example.aimock.messages.model.MessageStatus;
 
 import java.util.UUID;
 
-/**
- * Events published to /topic/session/{sessionId} for real-time UI updates.
- */
 public record SessionTopicEvent(
         String type,
         UUID sessionId,

@@ -7,9 +7,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-/**
- * Enqueues SQS jobs only after the surrounding DB transaction commits.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j

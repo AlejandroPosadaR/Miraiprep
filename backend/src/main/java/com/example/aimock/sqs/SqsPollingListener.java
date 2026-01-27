@@ -17,15 +17,6 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
 import java.util.List;
 
-/**
- * Simple SQS long-polling listener.
- *
- * - Reads messages from the configured queue URL
- * - Hands message bodies to {@link SQSMessageConsumer}
- * - Deletes messages only on SUCCESS
- *
- * For production scale, consider Spring Cloud AWS @SqsListener or multiple consumer instances.
- */
 @Component
 @EnableScheduling
 @RequiredArgsConstructor

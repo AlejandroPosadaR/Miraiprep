@@ -17,10 +17,6 @@ import reactor.core.publisher.Flux;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Main service for processing AI interview messages.
- * Handles the complete flow: context retrieval, AI generation, and message updates.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -34,14 +30,6 @@ public class AIMessageProcessor {
     @Value("${app.ai.streaming.enabled:true}")
     private boolean streamingEnabled;
 
-    /**
-     * Processes an AI message job.
-     * 
-     * @param interviewerMessageId The placeholder message ID to update with AI response
-     * @param sessionId The interview session ID
-     * @param userContent The user's message content that triggered this AI response
-     * @return Processing result with status and generated content
-     */
     public AIProcessingResult processMessage(
             UUID interviewerMessageId,
             UUID sessionId,

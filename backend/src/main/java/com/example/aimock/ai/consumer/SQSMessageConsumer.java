@@ -8,11 +8,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-/**
- * Consumer for SQS messages containing AI processing jobs.
- * 
- * In production, this would be triggered by AWS SQS message listeners.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -21,11 +16,6 @@ public class SQSMessageConsumer {
     private final AIMessageProcessor aiMessageProcessor;
     private final ObjectMapper objectMapper;
 
-    /**
-     * Processes an SQS message containing an AI job.
-     * 
-     * @param messageBody JSON string containing AIProcessingRequest
-     */
     public AIProcessingResult processMessage(String messageBody) throws Exception {
         log.info("Received SQS message (len={} chars)", messageBody != null ? messageBody.length() : 0);
 

@@ -18,10 +18,6 @@ public class InterviewStompController {
     private final MessageService messageService;
     private final SessionTopicPublisher topicPublisher;
 
-    /**
-     * Client sends to /app/interview/send with payload InterviewMessageRequest.
-     * Creates user message, enqueues AI job, sends ack to /topic/session/{sessionId}.
-     */
     @MessageMapping("/interview/send")
     public void sendMessage(@Valid @Payload InterviewMessageRequest req) {
         log.debug("STOMP message: sessionId={}, userId={}", req.getSessionId(), req.getUserId());

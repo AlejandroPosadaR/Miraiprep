@@ -12,13 +12,6 @@ import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
 import java.util.UUID;
 
-/**
- * Real AWS SQS implementation for enqueueing AI message jobs.
- * 
- * To use this instead of NoOpSQSService, set:
- * - spring.profiles.active=prod (or create a profile that excludes NoOpSQSService)
- * - Configure AWS credentials and SQS queue URL
- */
 @Service
 @ConditionalOnProperty(name = "app.sqs.enabled", havingValue = "true")
 @RequiredArgsConstructor

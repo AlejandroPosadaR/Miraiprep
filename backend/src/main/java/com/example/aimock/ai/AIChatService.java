@@ -9,9 +9,6 @@ import reactor.core.publisher.Flux;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Service for interacting with AI chat models (OpenAI, etc.) via Spring AI.
- */
 @Service
 @Slf4j
 public class AIChatService {
@@ -22,14 +19,6 @@ public class AIChatService {
         this.chatClient = chatClientBuilder.build();
     }
 
-    /**
-     * Generates an AI interview response based on conversation context.
-     * 
-     * @param interviewType Type of interview (OOP, BEHAVIORAL, SYSTEM_DESIGN, etc.)
-     * @param conversationHistory Previous messages in the conversation
-     * @param latestUserMessage The most recent user message
-     * @return Generated AI response
-     */
     public String generateResponse(
             String interviewType,
             List<Message> conversationHistory,
@@ -64,9 +53,6 @@ public class AIChatService {
         return aiResponse == null ? "" : aiResponse;
     }
 
-    /**
-     * Streams an AI interview response as deltas (token chunks).
-     */
     public Flux<String> streamResponse(
             String interviewType,
             List<Message> conversationHistory,
@@ -92,9 +78,6 @@ public class AIChatService {
                 .content();
     }
 
-    /**
-     * Builds conversation context from message history.
-     */
     private String buildConversationContext(List<Message> messages) {
         if (messages.isEmpty()) {
             return "(No previous messages)";
@@ -110,9 +93,6 @@ public class AIChatService {
                 .collect(Collectors.joining("\n"));
     }
 
-    /**
-     * Builds system prompt based on interview type.
-     */
     private String buildSystemPrompt(String interviewType) {
         return switch (interviewType.toUpperCase()) {
             case "OOP" -> """

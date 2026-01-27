@@ -19,9 +19,6 @@ import jakarta.persistence.PersistenceContext;
 
 import java.util.Map;
 
-/**
- * Base for controller integration tests. Creates a test user before each test.
- */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")

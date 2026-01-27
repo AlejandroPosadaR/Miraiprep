@@ -9,10 +9,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.UUID;
 
-/**
- * Custom UserDetails implementation that includes the User entity.
- * Used as @AuthenticationPrincipal in controllers.
- */
 @Getter
 public class AuthUser implements UserDetails {
 

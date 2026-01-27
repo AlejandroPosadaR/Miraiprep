@@ -6,9 +6,6 @@ import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
-/**
- * Result of AI message processing.
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

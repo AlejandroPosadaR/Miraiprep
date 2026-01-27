@@ -10,20 +10,12 @@ import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
-/**
- * Service for getting current authenticated user in deeper layers.
- * Use this instead of directly accessing SecurityContextHolder.
- */
 @Service
 @RequiredArgsConstructor
 public class CurrentUserProvider {
 
     private final UserRepository userRepository;
 
-    /**
-     * Gets the current authenticated user's ID from SecurityContext.
-     * Throws UnauthorizedException if not authenticated.
-     */
     public UUID getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -42,9 +34,6 @@ public class CurrentUserProvider {
         return user.getId();
     }
 
-    /**
-     * Gets the full User entity for the current authenticated user.
-     */
     public User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {

@@ -7,9 +7,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
-/**
- * Small wrapper around SimpMessagingTemplate to publish session-scoped events.
- */
 @Component
 @RequiredArgsConstructor
 public class SessionTopicPublisher {
