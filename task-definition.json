@@ -1,0 +1,68 @@
+{
+  "family": "miraiprep-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::495599737322:role/miraiprep-ecs-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::495599737322:role/miraiprep-ecs-task-role",
+  "containerDefinitions": [
+    {
+      "name": "miraiprep-backend",
+      "image": "495599737322.dkr.ecr.ap-southeast-2.amazonaws.com/miraiprep-backend:latest",
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/miraiprep-backend",
+          "awslogs-region": "ap-southeast-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "environment": [
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "rds"
+        },
+        {
+          "name": "DATABASE_URL",
+          "value": "jdbc:postgresql://miraiprep.c7aeo40oghel.ap-southeast-2.rds.amazonaws.com:5432/postgres?sslmode=require"
+        },
+        {
+          "name": "DATABASE_USERNAME",
+          "value": "postgres"
+        },
+        {
+          "name": "APP_SQS_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "SQS_QUEUE_URL",
+          "value": "https://sqs.ap-southeast-2.amazonaws.com/495599737322/ai-mock.fifo"
+        },
+        {
+          "name": "TTS_PROVIDER",
+          "value": "openai"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "SPRING_AI_OPENAI_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-southeast-2:495599737322:secret:miraiprep/openai-api-key-f4no7r"
+        },
+        {
+          "name": "DATABASE_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:ap-southeast-2:495599737322:secret:miraiprep/database-password-6nqSJz"
+        }
+      ],
+      "essential": true
+    }
+  ]
+}
