@@ -60,7 +60,102 @@
 
 ## 🏗️ Architecture
 
-### System Architecture
+### AWS Production Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                                    AWS Cloud                                         │
+│                                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                              Route 53 DNS                                    │   │
+│  │                   miraiprep.com → CloudFront                                │   │
+│  │                   api.miraiprep.com → ALB                                   │   │
+│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│                                      │                                               │
+│              ┌───────────────────────┴───────────────────────┐                      │
+│              ▼                                               ▼                       │
+│  ┌───────────────────────────┐               ┌──────────────────────────────────┐  │
+│  │      CloudFront CDN       │               │   Application Load Balancer      │  │
+│  │   (miraiprep.com)         │               │   (api.miraiprep.com)            │  │
+│  │   + ACM Certificate       │               │   + ACM Certificate (Sydney)     │  │
+│  └───────────┬───────────────┘               └──────────────┬───────────────────┘  │
+│              │                                              │                        │
+│              ▼                                              ▼                        │
+│  ┌───────────────────────────┐               ┌──────────────────────────────────┐  │
+│  │        S3 Bucket          │               │         ECS Fargate              │  │
+│  │   (miraiprep)             │               │   ┌──────────────────────────┐   │  │
+│  │   React SPA Static Files  │               │   │   Spring Boot Container  │   │  │
+│  └───────────────────────────┘               │   │   ┌──────────────────┐   │   │  │
+│                                              │   │   │ REST Controllers │   │   │  │
+│                                              │   │   │ (Auth, Session,  │   │   │  │
+│                                              │   │   │  Message, Speech)│   │   │  │
+│                                              │   │   └────────┬─────────┘   │   │  │
+│                                              │   │            │             │   │  │
+│                                              │   │   ┌────────▼─────────┐   │   │  │
+│                                              │   │   │ WebSocket/STOMP  │   │   │  │
+│                                              │   │   │ (Real-time)      │   │   │  │
+│                                              │   │   └────────┬─────────┘   │   │  │
+│                                              │   │            │             │   │  │
+│                                              │   │   ┌────────▼─────────┐   │   │  │
+│                                              │   │   │ Message Service  │───┼───┼──┼──► SQS FIFO
+│                                              │   │   │ (Queue Jobs)     │   │   │  │   (ai-mock.fifo)
+│                                              │   │   └──────────────────┘   │   │  │       │
+│                                              │   │                          │   │  │       │
+│                                              │   │   ┌──────────────────┐   │   │  │       │
+│                                              │   │   │ SQS Poller       │◄──┼───┼──┼───────┘
+│                                              │   │   │ (AI Worker)      │   │   │  │
+│                                              │   │   └────────┬─────────┘   │   │  │
+│                                              │   │            │             │   │  │
+│                                              │   │   ┌────────▼─────────┐   │   │  │
+│                                              │   │   │ AI Chat Service  │───┼───┼──┼──► OpenAI API
+│                                              │   │   │ (GPT-4o-mini)    │   │   │  │   (Chat, TTS, STT)
+│                                              │   │   └────────┬─────────┘   │   │  │
+│                                              │   │            │             │   │  │
+│                                              │   │   ┌────────▼─────────┐   │   │  │
+│                                              │   │   │ JPA Repository   │   │   │  │
+│                                              │   │   └────────┬─────────┘   │   │  │
+│                                              │   └────────────┼─────────────┘   │  │
+│                                              └────────────────┼─────────────────┘  │
+│                                                               │                     │
+│                                                               ▼                     │
+│                                              ┌──────────────────────────────────┐  │
+│                                              │       RDS PostgreSQL             │  │
+│                                              │   (miraiprep.*.rds.amazonaws.com)│  │
+│                                              │   + SSL/TLS Encryption           │  │
+│                                              └──────────────────────────────────┘  │
+│                                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                           Supporting Services                                │   │
+│  │                                                                              │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │   │
+│  │  │    ECR      │  │  Secrets    │  │ CloudWatch  │  │      IAM Roles      │ │   │
+│  │  │ (Docker     │  │  Manager    │  │   Logs      │  │ (ECS Task Execution │ │   │
+│  │  │  Registry)  │  │ (API Keys,  │  │ (/ecs/      │  │  + Task Role)       │ │   │
+│  │  │             │  │  DB Pass)   │  │  miraiprep) │  │                     │ │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────────────┘ │   │
+│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              GitHub Actions CI/CD                                    │
+│                                                                                      │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐  │
+│  │   On Push    │───►│ Build Docker │───►│ Push to ECR  │───►│ Deploy to ECS    │  │
+│  │  (main)      │    │   Image      │    │              │    │ (Force New       │  │
+│  │              │    │              │    │              │    │  Deployment)     │  │
+│  └──────────────┘    └──────────────┘    └──────────────┘    └──────────────────┘  │
+│                                                                                      │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐  │
+│  │   On Push    │───►│ npm run     │───►│ Upload to S3 │───►│ Invalidate       │  │
+│  │  (main)      │    │   build     │    │              │    │ CloudFront Cache │  │
+│  └──────────────┘    └──────────────┘    └──────────────┘    └──────────────────┘  │
+│                                                                                      │
+│  Authentication: OIDC (OpenID Connect) - No long-lived AWS credentials             │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### System Architecture (Application Level)
 
 ```mermaid
 graph TB
@@ -91,9 +186,9 @@ graph TB
         J --> O[OpenAI STT API]
     end
     
-    subgraph "Queue Layer (Optional)"
-        G --> P[AWS SQS Queue]
-        P --> Q[SQS Poller]
+    subgraph "Queue Layer"
+        G --> P[AWS SQS FIFO<br/>ai-mock.fifo]
+        P --> Q[SQS Polling Listener<br/>100ms interval]
         Q --> R[AI Message Processor]
         R --> H
     end
@@ -108,7 +203,7 @@ graph TB
     D -->|Audio| J
 ```
 
-### Complete Request Flow
+### Complete Request Flow (with SQS)
 
 ```mermaid
 sequenceDiagram
@@ -116,37 +211,109 @@ sequenceDiagram
     participant F as React Frontend
     participant WS as WebSocket Handler
     participant MS as Message Service
+    participant SQS as AWS SQS FIFO
+    participant POLL as SQS Poller
+    participant AI as AI Message Processor
     participant DB as PostgreSQL
-    participant AI as AI Chat Service
     participant OAI as OpenAI API
     
-    Note over U,OAI: User Sends Message
+    Note over U,OAI: 1. User Sends Message
     
     U->>F: Type/Speak Message
     F->>WS: Publish via STOMP<br/>/app/interview/send
-    WS->>MS: Create User Message
-    MS->>DB: Insert (Idempotent)<br/>SELECT FOR UPDATE
-    MS->>DB: Allocate Sequence Number
-    MS-->>WS: Message Created
-    WS-->>F: Confirm Receipt
-    F-->>U: Show "Sending..."
+    WS->>MS: createUserMessageAndEnqueue()
+    MS->>DB: SELECT FOR UPDATE<br/>(Pessimistic Lock)
+    MS->>DB: Insert USER message<br/>+ INTERVIEWER placeholder
+    MS->>SQS: Send AI Job<br/>(messageId, sessionId, content)
+    MS-->>WS: Return message IDs
+    WS-->>F: Publish "accepted"<br/>/topic/session/{id}
+    F-->>U: Show user message
     
-    Note over U,OAI: AI Processing
+    Note over U,OAI: 2. Async AI Processing
     
-    MS->>AI: Process AI Response
-    AI->>DB: Load Conversation History<br/>(Last 20 messages)
-    AI->>OAI: Stream Request<br/>GPT-4o-mini
-    OAI-->>AI: Token Stream
-    AI-->>WS: Publish Deltas<br/>/topic/session/{id}
-    WS-->>F: WebSocket Event
-    F-->>U: Display Streaming Text
+    POLL->>SQS: Long Poll (20s wait)
+    SQS-->>POLL: Return message
+    POLL->>AI: processMessage()
+    AI->>DB: Load session + history<br/>(Last 20 messages)
+    AI->>OAI: Stream chat completion<br/>GPT-4o-mini
     
-    Note over U,OAI: Finalization
+    Note over U,OAI: 3. Real-time Streaming
     
-    AI->>DB: Save Complete Response
-    MS-->>WS: Message Complete
-    WS-->>F: Final Update
-    F-->>U: Show Complete Response
+    loop For each token
+        OAI-->>AI: Token chunk
+        AI-->>WS: Publish delta<br/>/topic/session/{id}
+        WS-->>F: WebSocket push
+        F-->>U: Append to display
+    end
+    
+    Note over U,OAI: 4. Finalization
+    
+    AI->>DB: Update placeholder<br/>with full response
+    AI-->>WS: Publish "complete"
+    POLL->>SQS: Delete message<br/>(Success)
+    WS-->>F: Final update
+    F-->>U: Show complete response
+```
+
+### Backend Component Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Spring Boot Application                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   HTTP/REST Endpoints                    WebSocket Endpoints                 │
+│   ┌─────────────────────┐                ┌─────────────────────┐            │
+│   │ AuthController      │                │ InterviewStomp      │            │
+│   │ /api/auth/*         │                │ Controller          │            │
+│   ├─────────────────────┤                │ /app/interview/*    │            │
+│   │ InterviewSession    │                └──────────┬──────────┘            │
+│   │ Controller          │                           │                        │
+│   │ /api/v1/sessions/*  │                           │                        │
+│   ├─────────────────────┤                           ▼                        │
+│   │ MessageController   │                ┌─────────────────────┐            │
+│   │ /api/v1/messages/*  │                │   MessageService    │            │
+│   ├─────────────────────┤                │ (Idempotent +       │            │
+│   │ SpeechController    │───────────────►│  Pessimistic Lock)  │            │
+│   │ /api/v1/speech/*    │                └──────────┬──────────┘            │
+│   └─────────────────────┘                           │                        │
+│            │                                        │                        │
+│            ▼                                        ▼                        │
+│   ┌─────────────────────┐                ┌─────────────────────┐            │
+│   │   SpeechService     │                │    SQSService       │            │
+│   │ (OpenAI TTS/STT)    │                │ (RealSQSService or  │            │
+│   └─────────────────────┘                │  NoOpSQSService)    │            │
+│                                          └──────────┬──────────┘            │
+│                                                     │                        │
+│                                                     ▼                        │
+│                                          ┌─────────────────────┐            │
+│                                          │  AWS SQS FIFO       │            │
+│                                          │  (ai-mock.fifo)     │            │
+│                                          └──────────┬──────────┘            │
+│                                                     │                        │
+│                                                     ▼                        │
+│   ┌─────────────────────────────────────────────────────────────────┐       │
+│   │                    SqsPollingListener                            │       │
+│   │  @Scheduled(fixedDelay=100ms) - polls SQS with 20s long polling │       │
+│   └───────────────────────────────┬─────────────────────────────────┘       │
+│                                   │                                          │
+│                                   ▼                                          │
+│   ┌─────────────────────────────────────────────────────────────────┐       │
+│   │                    AIMessageProcessor                            │       │
+│   │  1. prepareForStreaming() - short TX, mark as STREAMING         │       │
+│   │  2. streamAiResponse()    - NO TX, stream tokens to WebSocket   │       │
+│   │  3. saveSuccessResult()   - short TX, save final response       │       │
+│   └───────────────────────────────┬─────────────────────────────────┘       │
+│                                   │                                          │
+│                                   ▼                                          │
+│   ┌─────────────────────────────────────────────────────────────────┐       │
+│   │                    AIChatService                                 │       │
+│   │  - Builds prompt with interview strategy                         │       │
+│   │  - Calls OpenAI GPT-4o-mini with streaming                      │       │
+│   │  - Publishes token deltas via SessionTopicPublisher             │       │
+│   └─────────────────────────────────────────────────────────────────┘       │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Database Schema
@@ -195,37 +362,86 @@ erDiagram
     }
 ```
 
-### Deployment Architecture
+### AWS Infrastructure Summary
+
+| Component | AWS Service | Configuration |
+|-----------|-------------|---------------|
+| **Frontend Hosting** | S3 + CloudFront | Static website, CDN, HTTPS |
+| **Frontend Domain** | Route 53 + ACM | `miraiprep.com` (us-east-1 cert) |
+| **Backend Runtime** | ECS Fargate | 1 vCPU, 2GB RAM, auto-scaling |
+| **Backend Domain** | Route 53 + ACM | `api.miraiprep.com` (ap-southeast-2 cert) |
+| **Load Balancer** | ALB | HTTP/HTTPS, WebSocket support |
+| **Database** | RDS PostgreSQL | Multi-AZ capable, SSL required |
+| **Message Queue** | SQS FIFO | `ai-mock.fifo`, exactly-once processing |
+| **Container Registry** | ECR | `miraiprep-backend` repository |
+| **Secrets** | Secrets Manager | OpenAI API key, DB password |
+| **Logs** | CloudWatch | `/ecs/miraiprep-backend` log group |
+| **CI/CD Auth** | IAM + OIDC | GitHub Actions role, no long-lived keys |
+
+### Deployment Architecture (Mermaid)
 
 ```mermaid
 graph TB
-    subgraph "AWS Cloud"
+    subgraph "Users"
+        U[Browser/Client]
+    end
+    
+    subgraph "AWS - Edge (Global)"
+        R53[Route 53 DNS]
+        CF[CloudFront CDN<br/>miraiprep.com]
+        ACM1[ACM Certificate<br/>us-east-1]
+    end
+    
+    subgraph "AWS - Sydney (ap-southeast-2)"
         subgraph "Frontend"
-            A[S3 Bucket<br/>miraiprep] --> B[CloudFront CDN]
-            B --> C[Users]
+            S3[S3 Bucket<br/>miraiprep]
         end
         
         subgraph "Backend"
-            D[ECS Fargate<br/>Spring Boot] --> E[Application Load Balancer]
-            E --> C
-            D --> F[RDS PostgreSQL]
-            D --> G[AWS SQS]
-            D --> H[CloudWatch Logs]
+            ALB[Application Load Balancer<br/>api.miraiprep.com]
+            ACM2[ACM Certificate<br/>ap-southeast-2]
+            ECS[ECS Fargate Cluster<br/>miraiprep-cluster]
+            TASK[ECS Task<br/>Spring Boot Container]
         end
         
-        subgraph "CI/CD"
-            I[GitHub Actions] --> J[ECR<br/>Docker Registry]
-            I --> A
-            I --> D
+        subgraph "Data & Queue"
+            RDS[(RDS PostgreSQL<br/>miraiprep DB)]
+            SQS[SQS FIFO Queue<br/>ai-mock.fifo]
+        end
+        
+        subgraph "Supporting"
+            ECR[ECR Registry<br/>miraiprep-backend]
+            SM[Secrets Manager<br/>API Keys & Passwords]
+            CW[CloudWatch Logs]
         end
     end
     
     subgraph "External"
-        D --> K[OpenAI API]
+        OAI[OpenAI API<br/>GPT-4o, Whisper, TTS]
     end
     
-    C -->|HTTPS| B
-    C -->|HTTPS| E
+    subgraph "CI/CD"
+        GH[GitHub Actions<br/>OIDC Auth]
+    end
+    
+    U -->|HTTPS| R53
+    R53 -->|miraiprep.com| CF
+    R53 -->|api.miraiprep.com| ALB
+    CF --> S3
+    CF -.-> ACM1
+    ALB --> ECS
+    ALB -.-> ACM2
+    ECS --> TASK
+    TASK --> RDS
+    TASK --> SQS
+    TASK --> OAI
+    TASK --> CW
+    TASK -.-> SM
+    GH -->|Push Image| ECR
+    GH -->|Deploy| ECS
+    GH -->|Upload| S3
+    GH -->|Invalidate| CF
+    ECR --> TASK
 ```
 
 ---
@@ -376,8 +592,8 @@ VITE_WS_URL=ws://localhost:8080
 
 ### Frontend
 - **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite 5.4 5.4
-- **UI Library**: shadcn/ui components (Radix UI) (Radix UI)
+- **Build Tool**: Vite 5.4
+- **UI Library**: shadcn/ui components (Radix UI)
 - **Styling**: Tailwind CSS
 - **State Management**: React Context API
 - **Real-time**: STOMP.js for WebSocket
@@ -407,7 +623,7 @@ VITE_WS_URL=ws://localhost:8080
 - **Idempotency**: Client-provided keys prevent duplicate operations
 - **Pessimistic Locking**: `SELECT ... FOR UPDATE` ensures message ordering
 - **Transaction Boundaries**: Short transactions, no DB locks during AI calls
-- **Connection Pooling**: Optimized HTTP client for OpenAI API (15 idle connections) (15 idle connections)
+- **Connection Pooling**: Optimized HTTP client for OpenAI API (15 idle connections)
 - **Message History Limiting**: Last 20 messages for optimal performance
 
 ---
@@ -425,14 +641,12 @@ VITE_WS_URL=ws://localhost:8080
 - ✅ HTTP connection pooling (15 idle connections)
 - ✅ Accurate TTFT measurement (excludes DB overhead)
 - ✅ SQS long polling (20s wait, 100ms poll interval)
-- ✅ SQS long polling (20s wait, 100ms poll interval)
 
 ### Scalability
 - **Concurrent Users**: Designed for horizontal scaling
 - **Message Throughput**: Optimized for high-volume sessions
-- **Database**: Connection pooling with HikariCP (10 max connections) (10 max connections)
+- **Database**: Connection pooling with HikariCP (10 max connections)
 - **Queue Processing**: SQS with 100ms polling interval
-- ✅ SQS long polling (20s wait, 100ms poll interval)
 
 ---
 
@@ -534,7 +748,6 @@ mvn verify
 - **SQL Injection Prevention**: Parameterized queries (JPA)
 - **Input Validation**: Bean validation annotations
 - **Idempotency Keys**: Prevent duplicate operations
-- **Secrets Management**: AWS Secrets Manager support
 - **Secrets Management**: AWS Secrets Manager support
 
 ---
