@@ -37,6 +37,9 @@ jobs:
     needs: ci
     environment:
       name: miraiprep-env
+    permissions:
+      id-token: write
+      contents: read
     outputs:
       backend-image: ${{ steps.build-backend.outputs.image }}
 
@@ -81,6 +84,9 @@ jobs:
     needs: ci
     environment:
       name: miraiprep-env
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - name: Checkout code
@@ -145,6 +151,9 @@ jobs:
     needs: build-backend
     environment:
       name: miraiprep-env
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - name: Configure AWS credentials
