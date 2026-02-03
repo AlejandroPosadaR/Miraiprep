@@ -3,15 +3,19 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import Pricing from "./pages/Pricing";
 import InterviewDemo from "./pages/InterviewDemo";
-import Interview from "./pages/Interview";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import { Loader2 } from "lucide-react";
+
+// Lazy load Interview page to create a separate bundle
+const Interview = lazy(() => import("./pages/Interview"));
 
 const queryClient = new QueryClient();
 
@@ -66,7 +70,15 @@ function AppRoutes() {
         path="/interview/:sessionId"
         element={
           <ProtectedRoute>
-            <Interview />
+            <Suspense
+              fallback={
+                <div className="min-h-screen flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
+                </div>
+              }
+            >
+              <Interview />
+            </Suspense>
           </ProtectedRoute>
         }
       />

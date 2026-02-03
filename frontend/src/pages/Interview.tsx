@@ -1,21 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Client } from "@stomp/stompjs";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, WS_BASE_URL, type Message, type EvaluationResult, type InterviewSession } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Mic, MicOff, Send, Phone, Loader2, Volume2, VolumeX, Sparkles, Zap, Waves, Trophy, Brain, MessageSquare, Lightbulb, Target, X, User, Clock, FileText, ChevronLeft, ChevronRight, Gauge, Video, VideoOff } from "lucide-react";
-import { useCamera } from "@/hooks/useCamera";
-import ReactMarkdown from "react-markdown";
-import remarkBreaks from "remark-breaks";
-import remarkGfm from "remark-gfm";
 import { useOpenAITextToSpeech } from "@/hooks/useOpenAITextToSpeech";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { useOpenAISpeechToText } from "@/hooks/useOpenAISpeechToText";
-import { Slider } from "@/components/ui/slider";
+import { InterviewSidebar } from "@/components/interview/InterviewSidebar";
+import { InterviewHeader } from "@/components/interview/InterviewHeader";
+import { InterviewMessages } from "@/components/interview/InterviewMessages";
+import { InterviewInput } from "@/components/interview/InterviewInput";
+import { InterviewEvaluationModal } from "@/components/interview/InterviewEvaluationModal";
 
 // Available OpenAI TTS voices - professional interviewer voices
 // Voice characteristics based on OpenAI TTS documentation:
@@ -145,6 +142,8 @@ export default function Interview() {
   const pendingTtsQueueRef = useRef<{ text: string; sequenceNumber: number; messageId?: string }[]>([]);
   const isProcessingTtsQueueRef = useRef(false); // Flag to ensure sequential processing
   const ttsSequenceCounterRef = useRef(0); // Counter to assign sequence numbers
+  // Track the last displayed STT value to avoid unnecessary updates - MUST be defined before hooks that use it
+  const lastDisplayedRef = useRef<string>("");
 
   // Speech-to-Text: Toggle between Web Speech API (free, instant) and OpenAI Whisper (high quality)
   const webStt = useSpeechToText({ lang: "en-US", continuous: true, interimResults: true });
@@ -157,16 +156,7 @@ export default function Interview() {
     },
   });
 
-  // Camera for video call experience
-  const camera = useCamera();
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Connect camera stream to video element
-  useEffect(() => {
-    if (videoRef.current && camera.stream) {
-      videoRef.current.srcObject = camera.stream;
-    }
-  }, [camera.stream]);
+  // Camera is now handled in InterviewSidebar component
 
   // Text-to-Speech: Toggle between OpenAI (high quality) and Web Speech API (free)
   const openaiTts = useOpenAITextToSpeech({
@@ -304,6 +294,9 @@ export default function Interview() {
     webTtsRef.current = webTts;
   }, [webTts]);
 
+  // Store speakWithAudioQueue in a ref to break circular dependency
+  const speakWithAudioQueueRef = useRef<((text: string, messageId?: string) => void) | null>(null);
+
   // Enhanced speak function with seamless audio queuing for OpenAI TTS
   const speakText = useCallback(async (text: string) => {
     // Strip markdown for cleaner speech
@@ -320,12 +313,14 @@ export default function Interview() {
 
     if (useOpenAITtsRef.current && openaiTtsRef.current.isSupported) {
       // OpenAI TTS: Use seamless audio queue
-      await speakWithAudioQueue(cleanText);
+      if (speakWithAudioQueueRef.current) {
+        speakWithAudioQueueRef.current(cleanText);
+      }
     } else if (webTtsRef.current.isSupported) {
       // Web Speech API: Queue multiple utterances for seamless playback
       webTtsRef.current.speak(cleanText);
     }
-  }, [speakWithAudioQueue]);
+  }, []);
 
   // Process next item in TTS queue - used by audio ended callbacks
   const processNextInQueueRef = useRef<() => void>(() => {});
@@ -426,6 +421,11 @@ export default function Interview() {
     void processTtsTextQueue();
   }, [processTtsTextQueue]);
 
+  // Update ref when speakWithAudioQueue changes
+  useEffect(() => {
+    speakWithAudioQueueRef.current = speakWithAudioQueue;
+  }, [speakWithAudioQueue]);
+
   const processTtsQueue = useCallback(async () => {
     if (ttsQueueActiveRef.current) return;
     if (!ttsEnabledRef.current || !ttsSupportedRef.current) return;
@@ -511,9 +511,6 @@ export default function Interview() {
   }, [speakAiResponse]);
 
   // Sync STT transcript into input - prevent duplication
-  // Track the last displayed value to avoid unnecessary updates
-  const lastDisplayedRef = useRef<string>("");
-  
   useEffect(() => {
     if (isListening) {
       // When actively listening, combine finalTranscript + interimTranscript
@@ -919,646 +916,125 @@ export default function Interview() {
   return (
     <div className="h-screen flex bg-background overflow-hidden">
       {/* Left Sidebar */}
-      <aside
-        className={`${
-          sidebarCollapsed ? "w-0 md:w-16" : "w-72"
-        } border-r bg-muted/20 flex-shrink-0 flex flex-col transition-all duration-300 overflow-y-auto overflow-x-visible`}
-      >
-        {/* Sidebar Toggle */}
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-background border rounded-r-lg p-1 hover:bg-muted transition-colors md:hidden"
-          style={{ left: sidebarCollapsed ? 0 : "17rem" }}
-        >
-          {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </button>
-
-        {!sidebarCollapsed && (
-          <>
-            {/* Video Call Area */}
-            <div className="p-4 border-b space-y-4">
-              {/* AI Interviewer Avatar - Animated when speaking */}
-              <div className="relative" style={{ overflow: "visible" }}>
-                <div 
-                  className={`w-28 h-28 mx-auto rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg relative ${
-                    isSpeaking ? "animate-pulse" : ""
-                  }`}
-                  style={{ overflow: "visible" }}
-                >
-                  {/* Speaking animation rings - visible outside container */}
-                  {isSpeaking && (
-                    <>
-                      <div className="absolute inset-0 rounded-full bg-violet-400/40 animate-ping" style={{ zIndex: 0 }} />
-                      <div className="absolute rounded-full border-2 border-violet-400/60 animate-pulse" style={{ 
-                        top: "-8px", 
-                        left: "-8px", 
-                        right: "-8px", 
-                        bottom: "-8px",
-                        zIndex: -1
-                      }} />
-                      <div className="absolute rounded-full border border-violet-300/40 animate-pulse" style={{ 
-                        top: "-16px", 
-                        left: "-16px", 
-                        right: "-16px", 
-                        bottom: "-16px",
-                        zIndex: -2,
-                        animationDelay: "0.2s"
-                      }} />
-                    </>
-                  )}
-                  <Brain className="h-14 w-14 text-white relative z-10" />
-                </div>
-                {/* Speaking indicator */}
-                {isSpeaking && (
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-1 bg-violet-500 rounded-full">
-                    <Waves className="h-3 w-3 text-white animate-pulse" />
-                    <span className="text-[10px] text-white font-medium">Speaking</span>
-                  </div>
-                )}
-              </div>
-              <p className="text-center font-semibold">AI Interviewer</p>
-              <p className="text-center text-xs text-muted-foreground">
-                {TTS_VOICES.find(v => v.id === selectedVoice)?.name || "Voice Assistant"}
-              </p>
-
-              {/* Divider */}
-              <div className="border-t pt-4">
-                {/* User Camera View */}
-                <div className="relative">
-                  <div className={`aspect-video rounded-xl overflow-hidden bg-muted border-2 ${
-                    isListening ? "border-red-500 shadow-lg shadow-red-500/20" : "border-transparent"
-                  }`}>
-                    {camera.isEnabled ? (
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        muted
-                        playsInline
-                        className="w-full h-full object-cover mirror"
-                        style={{ transform: "scaleX(-1)" }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
-                        <VideoOff className="h-8 w-8 mb-2" />
-                        <span className="text-xs">Camera off</span>
-                      </div>
-                    )}
-                    {/* Listening indicator overlay */}
-                    {isListening && (
-                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-1 bg-red-500 rounded-full">
-                        <div className="h-2 w-2 bg-white rounded-full animate-pulse" />
-                        <span className="text-[10px] text-white font-medium">Listening</span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-center text-xs text-muted-foreground mt-2">You</p>
-                  
-                  {/* Camera Toggle */}
-                  <Button
-                    variant={camera.isEnabled ? "secondary" : "outline"}
-                    size="sm"
-                    className="w-full mt-2 gap-2"
-                    onClick={() => camera.toggle()}
-                    disabled={camera.isLoading}
-                  >
-                    {camera.isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : camera.isEnabled ? (
-                      <>
-                        <Video className="h-4 w-4" />
-                        <span>Camera On</span>
-                      </>
-                    ) : (
-                      <>
-                        <VideoOff className="h-4 w-4" />
-                        <span>Turn On Camera</span>
-                      </>
-                    )}
-                  </Button>
-                  {camera.error && (
-                    <p className="text-xs text-red-500 mt-1 text-center">{camera.error}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Interview Info */}
-            <div className="p-4 space-y-4 flex-1 overflow-y-auto">
-              {/* Timer */}
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-background border">
-                <Clock className="h-5 w-5 text-violet-500" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Duration</p>
-                  <p className="font-mono font-semibold text-lg">{elapsedTime}</p>
-                </div>
-              </div>
-
-              {/* Interview Type */}
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-background border">
-                <Target className="h-5 w-5 text-violet-500" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Interview Type</p>
-                  <p className="font-medium">{interviewTypeLabel}</p>
-                </div>
-              </div>
-
-              {/* Experience Level */}
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-background border">
-                <Trophy className="h-5 w-5 text-violet-500" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Experience Level</p>
-                  <p className="font-medium">{experienceLevelLabel}</p>
-                </div>
-              </div>
-
-              {/* Questions Asked */}
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-background border">
-                <MessageSquare className="h-5 w-5 text-violet-500" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Messages</p>
-                  <p className="font-medium">{messages.length}</p>
-                </div>
-              </div>
-
-              {/* Job Description (if provided) */}
-              {session?.jobDescription && (
-                <div className="p-3 rounded-lg bg-background border">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileText className="h-4 w-4 text-violet-500" />
-                    <p className="text-xs text-muted-foreground font-medium">Job Description</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-4">
-                    {session.jobDescription}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Connection Status */}
-            <div className="p-4 border-t">
-              <div className="flex items-center gap-2 text-sm">
-                <div className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`} />
-                <span className={connected ? "text-emerald-600" : "text-amber-600"}>
-                  {connected ? "Connected" : "Connecting..."}
-                </span>
-              </div>
-            </div>
-          </>
-        )}
-      </aside>
+      <InterviewSidebar
+        sidebarCollapsed={sidebarCollapsed}
+        setSidebarCollapsed={setSidebarCollapsed}
+        isSpeaking={isSpeaking}
+        isListening={isListening}
+        selectedVoice={selectedVoice}
+        session={session}
+        messages={messages}
+        elapsedTime={elapsedTime}
+        connected={connected}
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-14 border-b flex items-center justify-between px-4 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" asChild>
-              <Link to="/dashboard">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <span className="font-medium hidden sm:inline">Interview</span>
-            {/* Status indicators with better design */}
-            {isSpeaking && (
-              <span className="text-xs text-violet-600 dark:text-violet-400 flex items-center gap-1.5 px-2 py-1 rounded-full bg-violet-50 dark:bg-violet-950/30">
-                <Waves className="h-3 w-3 animate-pulse" />
-                <span className="hidden sm:inline">AI Speaking</span>
-              </span>
-            )}
-            {isProcessing && (
-              <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-950/30">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span className="hidden sm:inline">Transcribing</span>
-              </span>
-            )}
-            {isListening && (
-              <span className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-50 dark:bg-red-950/30">
-                <Mic className="h-3 w-3 animate-pulse" />
-                <span className="hidden sm:inline">Listening</span>
-              </span>
-            )}
-          </div>
-        <div className="flex items-center gap-2">
-          {/* Voice Settings Group */}
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg border bg-muted/30">
-            {/* STT Quality Toggle - OpenAI Whisper (high quality) vs Web Speech API (instant, free) */}
-            <Button
-              variant={useOpenAIStt ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => {
-                // Stop any active listening when switching providers
-                if (isListening) {
-                  void stopListening();
-                }
-                resetStt();
-                setInput("");
-                lastDisplayedRef.current = "";
-                setUseOpenAIStt((prev) => !prev);
-              }}
-              className="gap-1.5 h-7 text-xs"
-              title={useOpenAIStt 
-                ? "Using OpenAI Whisper STT (high quality, slight delay)" 
-                : "Using Web Speech API STT (instant, free)"}
-              disabled={isListening || isProcessing}
-            >
-              {useOpenAIStt ? (
-                <>
-                  <Sparkles className="h-3 w-3" />
-                  <span className="hidden sm:inline">Premium STT</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="h-3 w-3" />
-                  <span className="hidden sm:inline">Free STT</span>
-                </>
-              )}
-            </Button>
-
-            <div className="w-px h-4 bg-border" />
-
-            {/* TTS Quality Toggle - OpenAI (high quality) vs Web Speech API (free) */}
-            <Button
-              variant={useOpenAITts ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setUseOpenAITts((prev) => !prev)}
-              className="gap-1.5 h-7 text-xs"
-              title={useOpenAITts ? "Using OpenAI TTS (high quality)" : "Using Web Speech API TTS (free)"}
-            >
-              {useOpenAITts ? (
-                <>
-                  <Sparkles className="h-3 w-3" />
-                  <span className="hidden sm:inline">Premium TTS</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="h-3 w-3" />
-                  <span className="hidden sm:inline">Free TTS</span>
-                </>
-              )}
-            </Button>
-
-            {/* TTS Toggle with better visual feedback */}
-            <Button
-              variant={ttsEnabled ? (isSpeaking ? "default" : "secondary") : "ghost"}
-              size="sm"
-              onClick={() => {
-                if (!ttsSupported) {
-                  if (!didShowTtsUnsupportedToast) {
-                    setDidShowTtsUnsupportedToast(true);
-                    toast({
-                      title: "Text-to-speech not supported",
-                      description: useOpenAITts 
-                        ? "OpenAI TTS unavailable. Check your API key."
-                        : "This browser doesn't support Web Speech Synthesis.",
-                      variant: "destructive",
-                    });
-                  }
-                  return;
-                }
-                if (ttsEnabled && isSpeaking) {
-                  cancelSpeech();
-                }
-                setTtsEnabled((prev) => !prev);
-              }}
-              className="h-7 gap-1.5"
-              title={ttsEnabled ? (isSpeaking ? "AI is speaking (click to stop)" : "AI voice on (click to disable)") : "AI voice off (click to enable)"}
-            >
-              {isSpeaking ? (
-                <>
-                  <Waves className="h-3 w-3 animate-pulse" />
-                  <span className="hidden sm:inline text-xs">Speaking</span>
-                </>
-              ) : ttsEnabled ? (
-                <>
-                  <Volume2 className="h-3 w-3" />
-                  <span className="hidden sm:inline text-xs">Voice On</span>
-                </>
-              ) : (
-                <>
-                  <VolumeX className="h-3 w-3" />
-                  <span className="hidden sm:inline text-xs">Voice Off</span>
-                </>
-              )}
-            </Button>
-
-            {/* Speed Control - only show when TTS is enabled */}
-            {ttsEnabled && (
-              <div className="flex items-center gap-1.5 px-2 border-l border-border/50">
-                <Gauge className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                <Slider
-                  value={[speakingSpeed]}
-                  onValueChange={(value) => setSpeakingSpeed(value[0])}
-                  min={0.5}
-                  max={1.5}
-                  step={0.1}
-                  className="w-16 sm:w-20"
-                  title={`Speaking speed: ${speakingSpeed.toFixed(1)}x`}
-                />
-                <span className="text-xs text-muted-foreground min-w-[2.5rem] text-right">
-                  {speakingSpeed.toFixed(1)}x
-                </span>
-              </div>
-            )}
-          </div>
-          <Button
-            variant="destructive"
-            size="sm"
-            disabled={ending || session?.status === "COMPLETED"}
-            onClick={handleEndInterview}
-            title={session?.status === "COMPLETED" ? "Interview already completed" : "End interview"}
-          >
-            {ending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Phone className="h-4 w-4 mr-2 rotate-[135deg]" />}
-            {session?.status === "COMPLETED" ? "Completed" : "End Interview"}
-          </Button>
-        </div>
-      </header>
-
-      <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : messages.length === 0 ? (
-          <p className="text-center text-muted-foreground py-12">No messages yet. Say hello to start.</p>
-        ) : (
-          messages.map((m) => (
-            <div
-              key={m.id}
-              className={`flex ${m.role === "USER" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-[80%] rounded-2xl px-4 py-2 ${
-                  m.role === "USER"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                }`}
-              >
-                <p className="text-xs opacity-80 mb-0.5">{m.role}</p>
-                {m.content && m.content.trim() ? (
-                  <div className="text-sm break-words">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm, remarkBreaks]}
-                      components={{
-                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                      }}
-                    >
-                      {m.content}
-                    </ReactMarkdown>
-                  </div>
-                ) : m.role === "INTERVIEWER" && (m.messageStatus === "STREAMING" || m.messageStatus === "PENDING") ? (
-                  <div className="flex items-center gap-1 py-1 text-muted-foreground">
-                    <span className="sr-only">Interviewer is typing</span>
-                    <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.25s]" />
-                    <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.1s]" />
-                    <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" />
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">(empty)</p>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="p-4 border-t bg-background flex gap-2 flex-shrink-0">
-        {/* Enhanced Mic Button with visual feedback */}
-        <div className="relative">
-          <Button
-            type="button"
-            variant={isListening ? "destructive" : isProcessing ? "secondary" : "outline"}
-            size="icon"
-            disabled={sending || !connected || isProcessing}
-            onClick={async () => {
-              if (!sttSupported) {
-                if (!didShowSttUnsupportedToast) {
-                  setDidShowSttUnsupportedToast(true);
-                  toast({
-                    title: "Speech-to-text not supported",
-                    description: useOpenAIStt 
-                      ? "Microphone access not available." 
-                      : "This browser doesn't support Web Speech API. Try Chrome/Edge.",
-                    variant: "destructive",
-                  });
-                }
-                return;
+        <InterviewHeader
+          isSpeaking={isSpeaking}
+          isProcessing={isProcessing}
+          isListening={isListening}
+          useOpenAIStt={useOpenAIStt}
+          useOpenAITts={useOpenAITts}
+          ttsEnabled={ttsEnabled}
+          ttsSupported={ttsSupported}
+          speakingSpeed={speakingSpeed}
+          session={session}
+          ending={ending}
+          didShowTtsUnsupportedToast={didShowTtsUnsupportedToast}
+          onBack={() => {}}
+          onToggleStt={() => {
+            setInput("");
+            lastDisplayedRef.current = "";
+            setUseOpenAIStt((prev) => !prev);
+          }}
+          onToggleTts={() => setUseOpenAITts((prev) => !prev)}
+          onToggleTtsEnabled={() => {
+            if (!ttsSupported) {
+              if (!didShowTtsUnsupportedToast) {
+                setDidShowTtsUnsupportedToast(true);
+                toast({
+                  title: "Text-to-speech not supported",
+                  description: useOpenAITts 
+                    ? "OpenAI TTS unavailable. Check your API key."
+                    : "This browser doesn't support Web Speech Synthesis.",
+                  variant: "destructive",
+                });
               }
-              if (isListening || isProcessing) {
-                await stopListening();
-                return;
-              }
-              if (isSpeaking) {
-                cancelSpeech();
-              }
-              // Clear input and reset STT before starting new recording to prevent duplication
-              setInput("");
-              lastDisplayedRef.current = "";
-              resetStt();
-              // Small delay to ensure reset completes before starting
-              setTimeout(() => {
-                startListening();
-              }, 50);
-            }}
-            className={`relative h-10 w-10 ${
-              isListening 
-                ? "animate-pulse shadow-lg shadow-red-500/50" 
-                : isProcessing 
-                  ? "animate-pulse" 
-                  : ""
-            }`}
-            aria-label={isListening ? "Stop speech-to-text" : isProcessing ? "Processing..." : "Start speech-to-text"}
-            title={
-              isListening 
-                ? "Listening... (click to stop)" 
-                : isProcessing 
-                  ? "Processing your speech..."
-                  : useOpenAIStt 
-                    ? "Start voice input (OpenAI Whisper)" 
-                    : "Start voice input (Web Speech API)"
+              return;
             }
-          >
-            {isProcessing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : isListening ? (
-              <>
-                <MicOff className="h-4 w-4" />
-                {/* Pulsing ring animation when listening */}
-                <span className="absolute inset-0 rounded-full bg-red-500/20 animate-ping" />
-              </>
-            ) : (
-              <Mic className="h-4 w-4" />
-            )}
-          </Button>
-          {/* Status indicator */}
-          {isListening && (
-            <div className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full border-2 border-background animate-pulse" />
-          )}
-          {isProcessing && (
-            <div className="absolute -top-1 -right-1 h-3 w-3 bg-yellow-500 rounded-full border-2 border-background animate-pulse" />
-          )}
-        </div>
-
-        {/* Input with better visual feedback */}
-        <div className="flex-1 relative">
-          <Input
-            placeholder={
-              isListening 
-                ? "🎤 Listening..." 
-                : isProcessing 
-                  ? "⏳ Transcribing..." 
-                  : "Type your message or click mic to speak…"
+            if (ttsEnabled && isSpeaking) {
+              cancelSpeech();
             }
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-            disabled={sending || !connected}
-            className={`transition-all ${
-              isListening 
-                ? "border-red-500 bg-red-50 dark:bg-red-950/20 shadow-sm" 
-                : isProcessing 
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20" 
-                  : ""
-            }`}
-          />
-          {/* Visual waveform indicator when listening */}
-          {isListening && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-              <div className="h-1 w-1 bg-red-500 rounded-full animate-pulse [animation-delay:0ms]" />
-              <div className="h-1.5 w-1 bg-red-500 rounded-full animate-pulse [animation-delay:150ms]" />
-              <div className="h-2 w-1 bg-red-500 rounded-full animate-pulse [animation-delay:300ms]" />
-              <div className="h-1.5 w-1 bg-red-500 rounded-full animate-pulse [animation-delay:450ms]" />
-              <div className="h-1 w-1 bg-red-500 rounded-full animate-pulse [animation-delay:600ms]" />
-            </div>
-          )}
-        </div>
+            setTtsEnabled((prev) => !prev);
+          }}
+          onSpeedChange={(speed) => setSpeakingSpeed(speed)}
+          onEndInterview={handleEndInterview}
+          onStopListening={async () => {
+            await stopListening();
+          }}
+          onResetStt={resetStt}
+          onCancelSpeech={cancelSpeech}
+          onShowTtsUnsupportedToast={() => {
+            setDidShowTtsUnsupportedToast(true);
+            toast({
+              title: "Text-to-speech not supported",
+              description: useOpenAITts 
+                ? "OpenAI TTS unavailable. Check your API key."
+                : "This browser doesn't support Web Speech Synthesis.",
+              variant: "destructive",
+            });
+          }}
+        />
 
-        {/* Send button */}
-        <Button 
-          onClick={sendMessage} 
-          disabled={sending || !connected || !input.trim()}
-          className="h-10 px-4"
-        >
-          {sending ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              <span className="hidden sm:inline">Sending</span>
-            </>
-          ) : (
-            <>
-              <Send className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Send</span>
-            </>
-          )}
-        </Button>
+        <InterviewMessages messages={messages} loading={loading} />
+
+        <InterviewInput
+          input={input}
+          setInput={setInput}
+          sending={sending}
+          connected={connected}
+          isListening={isListening}
+          isProcessing={isProcessing}
+          sttSupported={sttSupported}
+          useOpenAIStt={useOpenAIStt}
+          didShowSttUnsupportedToast={didShowSttUnsupportedToast}
+          onInputChange={(value) => setInput(value)}
+          onSend={sendMessage}
+          onMicClick={async () => {
+            if (isListening || isProcessing) {
+              await stopListening();
+              return;
+            }
+            if (isSpeaking) {
+              cancelSpeech();
+            }
+            setInput("");
+            lastDisplayedRef.current = "";
+            resetStt();
+            setTimeout(() => {
+              startListening();
+            }, 50);
+          }}
+          onShowSttUnsupportedToast={() => {
+            setDidShowSttUnsupportedToast(true);
+            toast({
+              title: "Speech-to-text not supported",
+              description: useOpenAIStt 
+                ? "Microphone access not available." 
+                : "This browser doesn't support Web Speech API. Try Chrome/Edge.",
+              variant: "destructive",
+            });
+          }}
+        />
       </div>
-      </div>
 
-      {/* Evaluation Modal */}
-      {showEvaluation && evaluation && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-2xl shadow-xl my-8">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-violet-500 to-purple-600 flex items-center justify-center">
-                  <Trophy className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">Interview Complete!</h3>
-                  <p className="text-muted-foreground">Here&apos;s your performance evaluation</p>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setShowEvaluation(false);
-                  navigate("/dashboard");
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Overall Score */}
-            <div className="text-center mb-8">
-              <div className="text-6xl font-bold bg-gradient-to-r from-violet-500 to-purple-600 bg-clip-text text-transparent">
-                {evaluation.overallScore?.toFixed(1) || "0"}/10
-              </div>
-              <p className="text-muted-foreground mt-1">Overall Score</p>
-            </div>
-
-            {/* Category Scores */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              {[
-                { label: "Knowledge", value: evaluation.knowledge, icon: Brain, color: "bg-blue-500" },
-                { label: "Communication", value: evaluation.communication, icon: MessageSquare, color: "bg-green-500" },
-                { label: "Problem Solving", value: evaluation.problemSolving, icon: Lightbulb, color: "bg-amber-500" },
-                { label: "Technical Depth", value: evaluation.technicalDepth, icon: Target, color: "bg-purple-500" },
-              ].map((cat) => (
-                <div key={cat.label} className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <cat.icon className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">{cat.label}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${cat.color} transition-all duration-500`}
-                        style={{ width: `${cat.value || 0}%` }}
-                      />
-                    </div>
-                    <span className="text-sm font-bold w-10 text-right">{cat.value || 0}%</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Feedback */}
-            {evaluation.feedback && (
-              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4 mb-4">
-                <h4 className="font-semibold mb-2">Feedback</h4>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{evaluation.feedback}</p>
-              </div>
-            )}
-
-            {/* Strengths & Areas for Improvement */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {evaluation.strengths && (
-                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-                  <h4 className="font-semibold text-green-700 dark:text-green-400 mb-2">💪 Strengths</h4>
-                  <p className="text-sm text-green-800 dark:text-green-300 whitespace-pre-wrap">{evaluation.strengths}</p>
-                </div>
-              )}
-              {evaluation.areasForImprovement && (
-                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
-                  <h4 className="font-semibold text-amber-700 dark:text-amber-400 mb-2">📈 Areas to Improve</h4>
-                  <p className="text-sm text-amber-800 dark:text-amber-300 whitespace-pre-wrap">{evaluation.areasForImprovement}</p>
-                </div>
-              )}
-            </div>
-
-            <Button
-              className="w-full bg-gradient-to-r from-violet-500 to-purple-600"
-              onClick={() => {
-                setShowEvaluation(false);
-                navigate("/dashboard");
-              }}
-            >
-              Back to Dashboard
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Evaluating overlay */}
-      {evaluating && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-8 text-center">
-            <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-violet-500" />
-            <h3 className="text-xl font-bold mb-2">Evaluating your interview...</h3>
-            <p className="text-muted-foreground">Our AI is analyzing your responses</p>
-          </div>
-        </div>
-      )}
+      <InterviewEvaluationModal
+        showEvaluation={showEvaluation}
+        evaluation={evaluation}
+        evaluating={evaluating}
+        onClose={() => setShowEvaluation(false)}
+      />
     </div>
   );
 }
