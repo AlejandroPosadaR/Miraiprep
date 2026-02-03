@@ -61,7 +61,7 @@ export default function Register() {
       });
       toast({
         title: 'Account created!',
-        description: 'Welcome to PrepPath. Let\'s start practicing!',
+        description: 'Welcome to MiraiPrep. Let\'s start practicing!',
       });
       navigate('/dashboard');
     } catch (error) {
@@ -82,9 +82,12 @@ export default function Register() {
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48Y2lyY2xlIGN4PSIzMCIgY3k9IjMwIiByPSIyIi8+PC9nPjwvZz48L3N2Zz4=')] opacity-30"></div>
         
         <div className="relative z-10">
-          <Link to="/" className="flex items-center gap-2 text-white">
-            <Sparkles className="h-8 w-8" />
-            <span className="text-2xl font-bold">PrepPath</span>
+          <Link to="/" className="flex items-center">
+            <img 
+              src="/miraiprep.png" 
+              alt="MiraiPrep" 
+              className="h-12 w-auto"
+            />
           </Link>
         </div>
         
@@ -117,7 +120,7 @@ export default function Register() {
         </motion.div>
         
         <div className="relative z-10 text-white/60 text-sm">
-          © 2024 PrepPath. All rights reserved.
+          © 2026 MiraiPrep. All rights reserved.
         </div>
       </div>
 
@@ -206,6 +209,7 @@ export default function Register() {
                   value={formData.password}
                   onChange={handleChange}
                   className="pl-10 pr-10"
+                  autoComplete="off"
                   required
                 />
                 <button
@@ -230,6 +234,7 @@ export default function Register() {
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   className="pl-10"
+                  autoComplete="off"
                   required
                 />
               </div>

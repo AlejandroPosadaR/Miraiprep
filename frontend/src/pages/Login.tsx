@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,10 +13,25 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
 
   const { login } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Check if redirected due to session expiration
+    const message = sessionStorage.getItem('sessionExpiredMessage');
+    if (message) {
+      setSessionExpiredMessage(message);
+      sessionStorage.removeItem('sessionExpiredMessage');
+      toast({
+        title: "Session Expired",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,9 +73,12 @@ export default function Login() {
       >
         {/* top brand */}
         <div className="flex items-center justify-center mb-8">
-          <Link to="/" className="flex items-center gap-2 text-white">
-            <Sparkles className="h-6 w-6" />
-            <span className="text-2xl font-bold">PrepPath</span>
+          <Link to="/" className="flex items-center">
+            <img 
+              src="/miraiprep.png" 
+              alt="MiraiPrep" 
+              className="h-12 w-auto"
+            />
           </Link>
         </div>
 
@@ -100,6 +118,17 @@ export default function Login() {
               <p className="text-muted-foreground">Sign in to continue your interview preparation</p>
             </div>
 
+            {sessionExpiredMessage && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 flex items-center gap-3 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200"
+              >
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <p className="text-sm">{sessionExpiredMessage}</p>
+              </motion.div>
+            )}
+
             <form onSubmit={handleSubmit} className="mt-6 space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -130,6 +159,7 @@ export default function Login() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10 pr-10"
+                    autoComplete="off"
                     required
                   />
                   <button
@@ -167,7 +197,7 @@ export default function Login() {
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="bg-white/90 dark:bg-slate-900/90 px-4 text-muted-foreground">
-                  New to PrepPath?
+                  New to MiraiPrep?
                 </span>
               </div>
             </div>

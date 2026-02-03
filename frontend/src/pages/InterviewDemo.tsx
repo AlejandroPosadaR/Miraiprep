@@ -37,11 +37,12 @@ const InterviewDemo = () => {
     <div className="min-h-screen bg-background">
       {/* Top Bar */}
       <div className="h-16 border-b border-border bg-card/50 backdrop-blur-xl flex items-center justify-between px-6">
-        <Link to="/" className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-display font-bold text-foreground">Lumino</span>
+        <Link to="/" className="flex items-center">
+          <img 
+            src="/miraiprep.png" 
+            alt="MiraiPrep" 
+            className="h-8 w-auto"
+          />
         </Link>
 
         <div className="flex items-center gap-4">

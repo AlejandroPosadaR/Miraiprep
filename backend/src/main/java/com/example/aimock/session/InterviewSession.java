@@ -62,6 +62,34 @@ public class InterviewSession {
     @Column(name = "ended_at")
     private LocalDateTime endedAt;
 
+    @Column(name = "experience_years")
+    @Builder.Default
+    private Integer experienceYears = 2;
+
+    @Column(name = "job_description", columnDefinition = "TEXT")
+    private String jobDescription;
+
+    @Column(name = "evaluation_score")
+    private java.math.BigDecimal evaluationScore;
+
+    @Column(name = "evaluation_knowledge")
+    private Integer evaluationKnowledge;
+
+    @Column(name = "evaluation_communication")
+    private Integer evaluationCommunication;
+
+    @Column(name = "evaluation_problem_solving")
+    private Integer evaluationProblemSolving;
+
+    @Column(name = "evaluation_technical_depth")
+    private Integer evaluationTechnicalDepth;
+
+    @Column(name = "evaluation_feedback", columnDefinition = "TEXT")
+    private String evaluationFeedback;
+
+    @Column(name = "evaluated_at")
+    private LocalDateTime evaluatedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

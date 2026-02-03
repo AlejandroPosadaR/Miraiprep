@@ -1,4 +1,3 @@
-import { Zap } from "lucide-react";
 
 const Footer = () => {
   return (
@@ -8,10 +7,11 @@ const Footer = () => {
           {/* Brand */}
           <div className="md:col-span-2">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Zap className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-display font-bold">Lumino</span>
+              <img 
+                src="/miraiprep.png" 
+                alt="MiraiPrep" 
+                className="h-10 w-auto"
+              />
             </div>
             <p className="text-muted-foreground max-w-sm">
               Illuminate your path to interview success with AI-powered practice.
@@ -40,7 +40,7 @@ const Footer = () => {
 
         <div className="pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            © 2024 Lumino. All rights reserved.
+            © 2026 MiraiPrep. All rights reserved.
           </p>
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#" className="hover:text-foreground transition-colors">Twitter</a>

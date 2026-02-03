@@ -6,7 +6,7 @@ const testimonials = [
     name: "Sarah Chen",
     role: "Software Engineer at Google",
     image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face",
-    content: "PrepPath helped me land my dream job! The AI feedback was incredibly detailed and helped me identify weak spots I didn't even know I had.",
+    content: "MiraiPrep helped me land my dream job! The AI feedback was incredibly detailed and helped me identify weak spots I didn't even know I had.",
     rating: 5,
   },
   {

@@ -46,4 +46,8 @@ frontend/build/
 
 AUTHENTICATION_EXPLANATION.md
 
+# Ignore all .md files except the main README.md
+*.md
+!README.md
+
 .env

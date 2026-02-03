@@ -64,11 +64,3 @@ spring.ai.openai.api-key=${SPRING_AI_OPENAI_API_KEY}
 spring.ai.openai.chat.options.model=gpt-4o-mini
 spring.ai.openai.chat.options.temperature=0.7
 ```
-
-## 📝 Next Steps
-
-- [ ] Add Redis Pub/Sub for streaming AI responses
-- [ ] Add retry logic with exponential backoff
-- [ ] Add dead-letter queue handling
-- [ ] Add WebSocket notifications when AI response is ready
-- [ ] Add streaming responses (token-by-token)

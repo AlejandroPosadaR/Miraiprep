@@ -24,5 +24,9 @@ public class CreateInterviewSessionRequest {
     @NotBlank(message = "Interview type is required")
     @Size(max = 50, message = "Interview type must be less than 50 characters")
     private String interviewType;
-    
+
+    private Integer experienceYears = 2;
+
+    @Size(max = 5000, message = "Job description must be less than 5000 characters")
+    private String jobDescription;
 }

@@ -41,7 +41,20 @@ public class SqsPollingListener {
 
     private volatile boolean credsErrorLogged = false;
 
-    @Scheduled(fixedDelayString = "${app.sqs.poll-delay-ms:1000}")
+    /**
+     * Polls SQS for messages with minimal latency.
+     * 
+     * Uses fixedDelay (not fixedRate) to avoid overlapping polls:
+     * - fixedDelay: Waits X ms AFTER completion, then starts next poll
+     * - With 100ms delay, worst case latency is ~100ms between polls
+     * - Long polling (waitTimeSeconds=20) means messages arrive immediately
+     *   if available in queue
+     * 
+     * Latency breakdown:
+     * - Best case: Message in queue → 0ms (returned immediately by long poll)
+     * - Worst case: Message arrives right after poll completes → ~100ms wait
+     */
+    @Scheduled(fixedDelayString = "${app.sqs.poll-interval-ms:100}")
     public void poll() {
         ReceiveMessageRequest req = ReceiveMessageRequest.builder()
                 .queueUrl(queueUrl)
@@ -54,7 +67,6 @@ public class SqsPollingListener {
         try {
             messages = sqsClient.receiveMessage(req).messages();
         } catch (SdkClientException e) {
-            // Typically missing AWS credentials / region / endpoint.
             if (!credsErrorLogged) {
                 credsErrorLogged = true;
                 log.error("SQS polling failed. Most likely missing AWS credentials in the container. " +

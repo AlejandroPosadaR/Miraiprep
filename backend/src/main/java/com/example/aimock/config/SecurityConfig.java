@@ -48,7 +48,12 @@ public class SecurityConfig {
                                 // OpenAPI/Swagger endpoints
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                // Actuator endpoints (Prometheus metrics)
+                                "/actuator/health",
+                                "/actuator/info",
+                                "/actuator/prometheus",
+                                "/actuator/metrics"
                         ).permitAll()
                         // All other endpoints require authentication
                         .anyRequest().authenticated()
