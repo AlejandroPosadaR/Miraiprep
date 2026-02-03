@@ -5,12 +5,12 @@
 ![Java](https://img.shields.io/badge/Java-21-orange?style=for-the-badge&logo=openjdk)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.9-brightgreen?style=for-the-badge&logo=spring)
 ![React](https://img.shields.io/badge/React-18-blue?style=for-the-badge&logo=react)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue?style=for-the-badge&logo=postgresql)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue?style=for-the-badge&logo=postgresql)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)
 
 **A production-ready, full-stack AI interview platform with real-time streaming, voice interaction, and intelligent evaluation**
 
-[Features](#-key-features) • [Architecture](#-architecture) • [Tech Stack](#-tech-stack) • [Quick Start](#-quick-start) • [Performance](#-performance-metrics)
+[Features](#-key-features) • [Architecture](#-architecture) • [Quick Start](#-quick-start) • [Performance](#-performance-metrics)
 
 </div>
 
@@ -64,68 +64,96 @@
 
 ```mermaid
 graph TB
-    subgraph "Frontend Layer"
-        A[React + TypeScript] --> B[WebSocket Client]
-        A --> C[Voice Hooks]
-        A --> D[API Services]
+    subgraph "Client Layer"
+        A[React Frontend<br/>Port 3000/5173] --> B[WebSocket Client<br/>STOMP.js]
+        A --> C[HTTP API Client]
+        A --> D[Voice Hooks<br/>STT/TTS]
     end
     
-    subgraph "Backend Layer"
-        E[Spring Boot API] --> F[WebSocket STOMP]
+    subgraph "Backend Services"
+        E[Spring Boot API<br/>Port 8080] --> F[WebSocket Handler<br/>STOMP]
         E --> G[Message Service]
-        E --> H[AI Service]
+        E --> H[AI Chat Service]
         E --> I[Evaluation Service]
-        G --> J[(PostgreSQL)]
-        H --> K[OpenAI API]
-        I --> K
+        E --> J[Speech Service]
+        E --> K[Auth Service<br/>JWT]
+    end
+    
+    subgraph "Data Layer"
+        G --> L[(PostgreSQL<br/>Port 5432)]
+        K --> L
+        I --> L
+    end
+    
+    subgraph "External Services"
+        H --> M[OpenAI API<br/>GPT-4o-mini]
+        J --> N[OpenAI TTS API]
+        J --> O[OpenAI STT API]
     end
     
     subgraph "Queue Layer (Optional)"
-        G --> L[SQS Queue]
-        L --> M[SQS Poller]
-        M --> N[AI Processor]
+        G --> P[AWS SQS Queue]
+        P --> Q[SQS Poller]
+        Q --> R[AI Message Processor]
+        R --> H
     end
     
     subgraph "Monitoring"
-        E --> O[Prometheus]
-        O --> P[Grafana]
+        E --> S[Prometheus<br/>Port 9090]
+        S --> T[Grafana<br/>Port 3001]
     end
     
-    B <--> F
-    D --> E
-    C --> E
-    N --> H
+    B <-->|WebSocket| F
+    C -->|REST API| E
+    D -->|Audio| J
 ```
 
-### Request Flow
+### Complete Request Flow
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant F as Frontend
-    participant WS as WebSocket
-    participant MS as MessageService
+    participant U as User Browser
+    participant F as React Frontend
+    participant WS as WebSocket Handler
+    participant MS as Message Service
     participant DB as PostgreSQL
-    participant AI as AI Service
+    participant AI as AI Chat Service
     participant OAI as OpenAI API
     
-    U->>F: Send Message
-    F->>WS: Publish via STOMP
-    WS->>MS: Create Message
-    MS->>DB: Idempotent Insert
-    MS->>AI: Process AI Job
-    AI->>OAI: Stream Response
+    Note over U,OAI: User Sends Message
+    
+    U->>F: Type/Speak Message
+    F->>WS: Publish via STOMP<br/>/app/interview/send
+    WS->>MS: Create User Message
+    MS->>DB: Insert (Idempotent)<br/>SELECT FOR UPDATE
+    MS->>DB: Allocate Sequence Number
+    MS-->>WS: Message Created
+    WS-->>F: Confirm Receipt
+    F-->>U: Show "Sending..."
+    
+    Note over U,OAI: AI Processing
+    
+    MS->>AI: Process AI Response
+    AI->>DB: Load Conversation History<br/>(Last 20 messages)
+    AI->>OAI: Stream Request<br/>GPT-4o-mini
     OAI-->>AI: Token Stream
-    AI-->>WS: Real-time Updates
-    WS-->>F: WebSocket Events
-    F-->>U: Display Response
+    AI-->>WS: Publish Deltas<br/>/topic/session/{id}
+    WS-->>F: WebSocket Event
+    F-->>U: Display Streaming Text
+    
+    Note over U,OAI: Finalization
+    
+    AI->>DB: Save Complete Response
+    MS-->>WS: Message Complete
+    WS-->>F: Final Update
+    F-->>U: Show Complete Response
 ```
 
 ### Database Schema
 
 ```mermaid
 erDiagram
-    USERS ||--o{ INTERVIEW_SESSIONS : has
+    USERS ||--o{ INTERVIEW_SESSIONS : creates
     INTERVIEW_SESSIONS ||--o{ MESSAGES : contains
     
     USERS {
@@ -133,29 +161,204 @@ erDiagram
         string email UK
         string username
         string password_hash
+        string first_name
+        string last_name
         timestamp created_at
+        timestamp updated_at
     }
     
     INTERVIEW_SESSIONS {
         uuid id PK
         uuid user_id FK
+        string title
         string interview_type
         int experience_years
         text job_description
         enum status
         bigint next_seq
+        numeric evaluation_score
+        timestamp started_at
+        timestamp ended_at
+        timestamp created_at
     }
     
     MESSAGES {
         uuid id PK
         uuid session_id FK
-        bigint sequence_number
+        bigint seq UK
         enum role
         text content
         string idempotency_key UK
         enum message_status
+        string audio_url
+        timestamp created_at
     }
 ```
+
+### Deployment Architecture
+
+```mermaid
+graph TB
+    subgraph "AWS Cloud"
+        subgraph "Frontend"
+            A[S3 Bucket<br/>miraiprep] --> B[CloudFront CDN]
+            B --> C[Users]
+        end
+        
+        subgraph "Backend"
+            D[ECS Fargate<br/>Spring Boot] --> E[Application Load Balancer]
+            E --> C
+            D --> F[RDS PostgreSQL]
+            D --> G[AWS SQS]
+            D --> H[CloudWatch Logs]
+        end
+        
+        subgraph "CI/CD"
+            I[GitHub Actions] --> J[ECR<br/>Docker Registry]
+            I --> A
+            I --> D
+        end
+    end
+    
+    subgraph "External"
+        D --> K[OpenAI API]
+    end
+    
+    C -->|HTTPS| B
+    C -->|HTTPS| E
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Docker** & **Docker Compose** (recommended)
+- **Java 21** (if running backend locally)
+- **Node.js 20+** (if running frontend locally)
+- **Maven 3.8+** (if running backend locally)
+- **OpenAI API Key** (required for AI features)
+
+### Option 1: Docker Compose (Easiest - Recommended)
+
+**One command to start everything:**
+
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd aiinter
+
+# Create .env file with your OpenAI API key
+echo "SPRING_AI_OPENAI_API_KEY=your-openai-api-key-here" > .env
+
+# Start all services
+docker-compose up -d
+
+# Check services are running
+docker-compose ps
+```
+
+**Access the application:**
+- 🌐 **Frontend**: http://localhost:3000
+- 🔧 **Backend API**: http://localhost:8080
+- 📊 **Grafana**: http://localhost:3001 (admin/admin)
+- 📈 **Prometheus**: http://localhost:9090
+
+**View logs:**
+```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f backend
+docker-compose logs -f frontend
+```
+
+**Stop services:**
+```bash
+docker-compose down
+```
+
+### Option 2: Local Development (For Development)
+
+**Step 1: Start Database**
+```bash
+# Start only PostgreSQL
+docker-compose up -d postgres
+
+# Verify it's running
+docker-compose ps postgres
+```
+
+**Step 2: Start Backend**
+```bash
+cd backend
+
+# Set environment variable
+export SPRING_AI_OPENAI_API_KEY=your-openai-api-key-here
+
+# Run Spring Boot
+mvn spring-boot:run
+
+# Backend will be available at http://localhost:8080
+```
+
+**Step 3: Start Frontend**
+```bash
+# In a new terminal
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
+
+# Frontend will be available at http://localhost:5173
+```
+
+### Environment Variables
+
+**Required for Backend:**
+```bash
+# OpenAI API Key (required)
+SPRING_AI_OPENAI_API_KEY=sk-proj-...
+
+# Database (optional - defaults to local Docker postgres)
+DATABASE_URL=jdbc:postgresql://localhost:5432/aimock
+DATABASE_USERNAME=postgres
+DATABASE_PASSWORD=postgres
+
+# SQS (optional - defaults to disabled)
+SQS_QUEUE_URL=https://sqs.region.amazonaws.com/account/queue-name
+APP_SQS_ENABLED=true
+```
+
+**Required for Frontend:**
+```bash
+# Create frontend/.env file
+VITE_API_URL=http://localhost:8080
+VITE_WS_URL=ws://localhost:8080
+```
+
+### Verify Installation
+
+1. **Check Backend Health:**
+   ```bash
+   curl http://localhost:8080/actuator/health
+   # Should return: {"status":"UP"}
+   ```
+
+2. **Check Frontend:**
+   - Open http://localhost:3000 (Docker) or http://localhost:5173 (local)
+   - You should see the MiraiPrep landing page
+
+3. **Check Database:**
+   ```bash
+   docker-compose exec postgres psql -U postgres -d aimock -c "\dt"
+   # Should list tables: users, interview_sessions, messages
+   ```
 
 ---
 
@@ -164,7 +367,7 @@ erDiagram
 ### Backend
 - **Framework**: Spring Boot 3.5.9 (Java 21)
 - **AI Integration**: Spring AI 1.1.2 with OpenAI GPT-4o-mini
-- **Database**: PostgreSQL 15 with Flyway migrations
+- **Database**: PostgreSQL 16 with Flyway migrations
 - **Real-time**: WebSocket (STOMP) for bidirectional communication
 - **Queue**: AWS SQS (optional, with local fallback)
 - **Security**: JWT authentication, Spring Security
@@ -173,18 +376,20 @@ erDiagram
 
 ### Frontend
 - **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **UI Library**: shadcn/ui components
+- **Build Tool**: Vite 5.4 5.4
+- **UI Library**: shadcn/ui components (Radix UI) (Radix UI)
 - **Styling**: Tailwind CSS
 - **State Management**: React Context API
 - **Real-time**: STOMP.js for WebSocket
 - **Voice**: Web Speech API + OpenAI APIs
+- **Routing**: React Router v6
 
 ### Infrastructure
 - **Containerization**: Docker & Docker Compose
-- **Database**: PostgreSQL (local) / AWS RDS (production)
-- **Deployment**: Ready for ECS Fargate / Kubernetes
+- **Database**: PostgreSQL 16 (local) / AWS RDS (production)
+- **Deployment**: ECS Fargate / S3 + CloudFront
 - **Monitoring**: Prometheus + Grafana stack
+- **CI/CD**: GitHub Actions
 
 ---
 
@@ -202,7 +407,7 @@ erDiagram
 - **Idempotency**: Client-provided keys prevent duplicate operations
 - **Pessimistic Locking**: `SELECT ... FOR UPDATE` ensures message ordering
 - **Transaction Boundaries**: Short transactions, no DB locks during AI calls
-- **Connection Pooling**: Optimized HTTP client for OpenAI API
+- **Connection Pooling**: Optimized HTTP client for OpenAI API (15 idle connections) (15 idle connections)
 - **Message History Limiting**: Last 20 messages for optimal performance
 
 ---
@@ -219,65 +424,15 @@ erDiagram
 - ✅ Conversation history limiting (20 messages)
 - ✅ HTTP connection pooling (15 idle connections)
 - ✅ Accurate TTFT measurement (excludes DB overhead)
+- ✅ SQS long polling (20s wait, 100ms poll interval)
+- ✅ SQS long polling (20s wait, 100ms poll interval)
 
 ### Scalability
 - **Concurrent Users**: Designed for horizontal scaling
 - **Message Throughput**: Optimized for high-volume sessions
-- **Database**: Connection pooling with HikariCP
+- **Database**: Connection pooling with HikariCP (10 max connections) (10 max connections)
 - **Queue Processing**: SQS with 100ms polling interval
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Java 21
-- Node.js 18+
-- Docker & Docker Compose
-- Maven 3.8+
-
-### Option 1: Docker Compose (Recommended)
-
-```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Access the application
-# Frontend: http://localhost:5173
-# Backend: http://localhost:8080
-```
-
-### Option 2: Local Development
-
-```bash
-# 1. Start PostgreSQL
-docker-compose up -d postgres
-
-# 2. Start Backend
-cd backend
-mvn spring-boot:run
-
-# 3. Start Frontend
-cd frontend
-npm install
-npm run dev
-```
-
-### Environment Variables
-
-**Backend** (`application.properties`):
-```properties
-spring.ai.openai.api-key=${SPRING_AI_OPENAI_API_KEY}
-spring.datasource.url=jdbc:postgresql://localhost:5432/aimock
-```
-
-**Frontend** (`.env`):
-```env
-VITE_API_URL=http://localhost:8080
-```
+- ✅ SQS long polling (20s wait, 100ms poll interval)
 
 ---
 
@@ -325,6 +480,19 @@ cd backend
 mvn test
 ```
 
+### Run Specific Test Class
+```bash
+cd backend
+mvn test -Dtest=AIChatServiceTest
+```
+
+### Generate Coverage Report
+```bash
+cd backend
+mvn verify
+# Report available at: backend/target/site/jacoco/index.html
+```
+
 ### Test Coverage
 - **Unit Tests**: Service layer, repositories, utilities
 - **Integration Tests**: API endpoints, WebSocket handlers
@@ -341,7 +509,7 @@ mvn test
 ## 📊 Monitoring & Observability
 
 ### Metrics (Prometheus)
-- `ai_time_to_first_token` - TTFT percentiles
+- `ai_time_to_first_token` - TTFT percentiles (P50, P95, P99)
 - `ai_response_duration` - Total AI processing time
 - `ai_processing_success/failure` - Success rates
 - `websocket_messages_sent` - Real-time message count
@@ -351,6 +519,10 @@ mvn test
 - Request latency tracking
 - Error rate monitoring
 - System health overview
+
+### Access Monitoring
+- **Grafana**: http://localhost:3001 (admin/admin)
+- **Prometheus**: http://localhost:9090
 
 ---
 
@@ -362,22 +534,31 @@ mvn test
 - **SQL Injection Prevention**: Parameterized queries (JPA)
 - **Input Validation**: Bean validation annotations
 - **Idempotency Keys**: Prevent duplicate operations
+- **Secrets Management**: AWS Secrets Manager support
+- **Secrets Management**: AWS Secrets Manager support
 
 ---
 
 ## 🚢 Deployment
 
-### Production Considerations
+### Production Architecture
+- **Frontend**: S3 + CloudFront CDN
+- **Backend**: ECS Fargate with Application Load Balancer
 - **Database**: AWS RDS PostgreSQL with SSL
 - **Queue**: AWS SQS for async processing
-- **Container**: Docker images for ECS/Kubernetes
-- **Monitoring**: Prometheus + Grafana stack
-- **Secrets**: Environment variables / AWS Secrets Manager
+- **Monitoring**: Prometheus + Grafana
+- **CI/CD**: GitHub Actions with OIDC
 
 ### Environment Profiles
 - `application.properties` - Default/local
 - `application-docker.properties` - Docker Compose
 - `application-rds.properties` - AWS RDS production
+
+### Deployment Documentation
+See `.github/` directory for:
+- CI/CD setup (`workflows/ci.yml`, `workflows/deploy.yml`)
+- AWS resource setup guides
+- Secrets management
 
 ---
 
@@ -389,11 +570,12 @@ mvn test
 - `GET /api/auth/me` - Current user info
 
 ### Interview Sessions
-- `POST /api/v1/sessions` - Create session
-- `GET /api/v1/sessions` - List sessions (paginated)
-- `GET /api/v1/sessions/{id}` - Get session details
-- `POST /api/v1/sessions/{id}/complete` - End interview
-- `POST /api/v1/sessions/{id}/evaluate` - Get evaluation
+- `POST /api/v1/interview-sessions` - Create session
+- `GET /api/v1/interview-sessions` - List sessions
+- `GET /api/v1/interview-sessions/paginated` - Paginated list
+- `GET /api/v1/interview-sessions/{id}` - Get session details
+- `PUT /api/v1/interview-sessions/{id}/complete` - End interview
+- `POST /api/v1/interview-sessions/{id}/evaluate` - Get evaluation
 
 ### Messages
 - `GET /api/v1/sessions/{id}/messages` - Get message history
@@ -401,20 +583,51 @@ mvn test
 - WebSocket: `/topic/session/{id}` - Receive updates
 
 ### Speech
-- `POST /api/v1/speech/text-to-speech` - Generate audio
-- `POST /api/v1/speech/speech-to-text` - Transcribe audio
+- `POST /api/v1/speech/synthesize` - Generate TTS audio
+- `POST /api/v1/speech/transcribe` - Transcribe audio (STT)
+
+### Health & Metrics
+- `GET /actuator/health` - Health check
+- `GET /actuator/prometheus` - Prometheus metrics
+
+---
+
+## 🐛 Troubleshooting
+
+### Backend won't start
+```bash
+# Check logs
+docker-compose logs backend
+
+# Common issues:
+# - Missing SPRING_AI_OPENAI_API_KEY
+# - Database not ready (wait for postgres health check)
+# - Port 8080 already in use
+```
+
+### Frontend shows connection errors
+```bash
+# Verify backend is running
+curl http://localhost:8080/actuator/health
+
+# Check VITE_API_URL in frontend/.env
+# Should be: VITE_API_URL=http://localhost:8080
+```
+
+### Database connection errors
+```bash
+# Check PostgreSQL is running
+docker-compose ps postgres
+
+# Check connection
+docker-compose exec postgres psql -U postgres -d aimock -c "SELECT 1"
+```
 
 ---
 
 ## 🤝 Contributing
 
 This is a personal project, but suggestions and feedback are welcome!
-
----
-
-## 📄 License
-
-See [LICENSE](LICENSE) file for details.
 
 ---
 
