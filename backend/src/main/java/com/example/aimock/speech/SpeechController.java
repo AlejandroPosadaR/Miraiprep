@@ -25,7 +25,6 @@ import java.io.IOException;
 @RequestMapping("/api/v1/speech")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000"})
 public class SpeechController {
 
     private final SpeechService speechService;
