@@ -325,7 +325,7 @@ export default function Interview() {
       // Web Speech API: Queue multiple utterances for seamless playback
       webTtsRef.current.speak(cleanText);
     }
-  }, []); // Empty deps - using refs instead
+  }, [speakWithAudioQueue]);
 
   // Process next item in TTS queue - used by audio ended callbacks
   const processNextInQueueRef = useRef<() => void>(() => {});
@@ -799,7 +799,7 @@ export default function Interview() {
       c.deactivate();
       clientRef.current = null;
     };
-  }, [sessionId, user?.userId]);
+  }, [sessionId, user?.userId, enqueueTts, extractSpeakableChunks, toast]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
