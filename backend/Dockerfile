@@ -17,6 +17,23 @@ WORKDIR /app
 # Install curl for healthcheck
 RUN apk add --no-cache curl
 
+# Copy AWS RDS SSL certificate bundle and import all certs into Java truststore
+COPY --from=build /app/src/main/resources/certs/global-bundle.pem /tmp/global-bundle.pem
+RUN cd /tmp && \
+    # Split bundle into individual certs
+    csplit -f cert- -b %02d.pem global-bundle.pem '/-----BEGIN CERTIFICATE-----/' '{*}' 2>/dev/null || true && \
+    # Import each cert into truststore
+    for cert in cert-*.pem; do \
+        if [ -s "$cert" ]; then \
+            keytool -import -trustcacerts -alias "aws-rds-$cert" \
+                -file "$cert" \
+                -keystore $JAVA_HOME/lib/security/cacerts \
+                -storepass changeit \
+                -noprompt 2>/dev/null || true; \
+        fi; \
+    done && \
+    rm -f /tmp/cert-*.pem /tmp/global-bundle.pem
+
 # Create non-root user
 RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring

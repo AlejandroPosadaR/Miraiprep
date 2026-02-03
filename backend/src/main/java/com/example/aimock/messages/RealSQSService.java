@@ -21,7 +21,7 @@ public class RealSQSService implements SQSService {
     private final SqsClient sqsClient;
     private final ObjectMapper objectMapper;
 
-    @Value("${app.sqs.queue-url}")
+    @Value("${app.sqs.queue-url:}")
     private String queueUrl;
 
     @Override

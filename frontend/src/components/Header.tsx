@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
-import { Zap } from "lucide-react";
 
 const Header = () => {
   return (
@@ -17,10 +16,11 @@ const Header = () => {
             className="flex items-center gap-3"
             whileHover={{ scale: 1.02 }}
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Zap className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-display font-bold text-foreground">Lumino</span>
+            <img 
+              src="/miraiprep.png" 
+              alt="MiraiPrep" 
+              className="h-10 w-auto"
+            />
           </motion.div>
         </Link>
 

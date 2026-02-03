@@ -23,7 +23,7 @@ import java.util.Map;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @org.springframework.transaction.annotation.Transactional
-abstract class AbstractControllerIntegrationTest {
+public abstract class AbstractControllerIntegrationTest {
 
     @Autowired
     protected MockMvc mockMvc;

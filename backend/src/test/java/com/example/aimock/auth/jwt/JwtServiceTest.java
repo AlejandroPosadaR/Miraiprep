@@ -96,4 +96,51 @@ class JwtServiceTest {
             assertThat(jwtService.validateToken(token, authUser)).isFalse();
         }
     }
+
+    @Nested
+    @DisplayName("extractExpiration")
+    class ExtractExpiration {
+        @Test
+        void extractsExpirationFromToken() {
+            UUID userId = UUID.randomUUID();
+            String email = "user@test.com";
+            String token = jwtService.generateToken(userId, email);
+
+            java.util.Date expiration = jwtService.extractExpiration(token);
+
+            assertThat(expiration).isNotNull();
+            assertThat(expiration).isAfter(new java.util.Date());
+        }
+    }
+
+    @Nested
+    @DisplayName("Token structure")
+    class TokenStructure {
+        @Test
+        void tokenHasThreeParts() {
+            String token = jwtService.generateToken(UUID.randomUUID(), "test@example.com");
+
+            String[] parts = token.split("\\.");
+            assertThat(parts).hasSize(3);
+        }
+
+        @Test
+        void differentUsersGetDifferentTokens() {
+            String token1 = jwtService.generateToken(UUID.randomUUID(), "user1@test.com");
+            String token2 = jwtService.generateToken(UUID.randomUUID(), "user2@test.com");
+
+            assertThat(token1).isNotEqualTo(token2);
+        }
+
+        @Test
+        void sameUserGetsSameUsername() {
+            UUID userId = UUID.randomUUID();
+            String email = "consistent@test.com";
+            
+            String token1 = jwtService.generateToken(userId, email);
+            String token2 = jwtService.generateToken(userId, email);
+
+            assertThat(jwtService.extractUsername(token1)).isEqualTo(jwtService.extractUsername(token2));
+        }
+    }
 }

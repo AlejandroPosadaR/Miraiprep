@@ -18,7 +18,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // Register WebSocket endpoint
+        // WebSocket handshakes check the Origin header for security (prevents unauthorized sites from connecting)
+        // We match the CORS configuration from SecurityConfig for consistency
         registry.addEndpoint("/ws")
-                .setAllowedOrigins("http://localhost:5173", "http://localhost:3000");
+                .setAllowedOriginPatterns("http://localhost:*", "http://127.0.0.1:*"); 
+                // Allows any localhost port (5173, 3000, etc.) for development
+                // In production, replace with your actual frontend domain
     }
 }

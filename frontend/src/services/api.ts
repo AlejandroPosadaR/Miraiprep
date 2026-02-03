@@ -36,6 +36,33 @@ export interface InterviewSession {
   endedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  experienceYears?: number;
+  jobDescription?: string;
+  evaluationScore?: number;
+  evaluationKnowledge?: number;
+  evaluationCommunication?: number;
+  evaluationProblemSolving?: number;
+  evaluationTechnicalDepth?: number;
+  evaluationFeedback?: string;
+  evaluatedAt?: string;
+}
+
+export interface EvaluationResult {
+  overallScore: number;
+  knowledge: number;
+  communication: number;
+  problemSolving: number;
+  technicalDepth: number;
+  feedback: string;
+  strengths?: string;
+  areasForImprovement?: string;
+}
+
+export interface PaginatedSessionsResponse {
+  sessions: InterviewSession[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  totalCount: number;
 }
 
 export interface Message {
@@ -48,6 +75,13 @@ export interface Message {
   audioUrl: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export const SESSION_EXPIRED_EVENT = 'session-expired';
+
+export interface ApiError extends Error {
+  code?: string;
+  status?: number;
 }
 
 class ApiService {
@@ -64,11 +98,32 @@ class ApiService {
     };
     const res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
     const data = await res.json().catch(() => ({}));
+    
     if (!res.ok) {
+      // Handle token expiration - 401 with TOKEN_EXPIRED code
+      if (res.status === 401 && (data?.code === 'TOKEN_EXPIRED' || data?.code === 'TOKEN_INVALID')) {
+        this.handleSessionExpired(data?.message || 'Your session has expired. Please log in again.');
+      }
+      
       const msg = typeof data?.message === 'string' ? data.message : 'Request failed';
-      throw new Error(msg);
+      const error = new Error(msg) as ApiError;
+      error.code = data?.code;
+      error.status = res.status;
+      throw error;
     }
     return data as T;
+  }
+
+  private handleSessionExpired(message: string): void {
+    // Clear auth data
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
+    // Store the message to display on login page
+    sessionStorage.setItem('sessionExpiredMessage', message);
+    
+    // Dispatch custom event for AuthContext to catch
+    window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: { message } }));
   }
 
   async login(credentials: LoginRequest): Promise<AuthResponse> {
@@ -135,14 +190,42 @@ class ApiService {
     return this.request<InterviewSession[]>('/api/v1/interview-sessions', { method: 'GET' });
   }
 
+  async getInterviewSessionsPaginated(options?: {
+    cursor?: string;
+    limit?: number;
+  }): Promise<PaginatedSessionsResponse> {
+    const sp = new URLSearchParams();
+    if (options?.cursor) sp.set('cursor', options.cursor);
+    if (options?.limit != null) sp.set('limit', String(options.limit));
+    const qs = sp.toString();
+    return this.request<PaginatedSessionsResponse>(
+      `/api/v1/interview-sessions/paginated${qs ? `?${qs}` : ''}`,
+      { method: 'GET' }
+    );
+  }
+
   async createInterviewSession(params: {
     userId: string;
     title: string;
     interviewType: string;
+    experienceYears?: number;
+    jobDescription?: string;
   }): Promise<InterviewSession> {
     return this.request<InterviewSession>('/api/v1/interview-sessions', {
       method: 'POST',
       body: JSON.stringify(params),
+    });
+  }
+
+  async getInterviewSession(sessionId: string): Promise<InterviewSession> {
+    return this.request<InterviewSession>(`/api/v1/interview-sessions/${sessionId}`, {
+      method: 'GET',
+    });
+  }
+
+  async evaluateInterview(sessionId: string): Promise<EvaluationResult> {
+    return this.request<EvaluationResult>(`/api/v1/interview-sessions/${sessionId}/evaluate`, {
+      method: 'POST',
     });
   }
 
@@ -170,6 +253,74 @@ class ApiService {
       `/api/v1/sessions/${sessionId}/messages/${qs ? `?${qs}` : ''}`,
       { method: 'GET' }
     );
+  }
+
+  /**
+   * Transcribe audio using OpenAI Whisper API
+   */
+  async transcribeAudio(formData: FormData): Promise<{ text: string }> {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // Don't set Content-Type - browser will set it with boundary for FormData
+    };
+    
+    const res = await fetch(`${API_BASE_URL}/api/v1/speech/transcribe`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = typeof data?.message === 'string' ? data.message : 'Transcription failed';
+      throw new Error(msg);
+    }
+    return data as { text: string };
+  }
+
+  /**
+   * Generate speech audio using OpenAI TTS API
+   */
+  async textToSpeech(text: string, options?: { 
+    voice?: string; 
+    speed?: number;
+    sequenceNumber?: number;
+    messageId?: string;
+  }): Promise<{ blob: Blob; sequenceNumber?: number; messageId?: string }> {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+    
+    const res = await fetch(`${API_BASE_URL}/api/v1/speech/synthesize`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        text,
+        voice: options?.voice || 'alloy',
+        speed: options?.speed || 1.0,
+        sequenceNumber: options?.sequenceNumber,
+        messageId: options?.messageId,
+      }),
+    });
+    
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const msg = typeof data?.message === 'string' ? data.message : 'TTS failed';
+      throw new Error(msg);
+    }
+    
+    const blob = await res.blob();
+    const seqHeader = res.headers.get('X-Audio-Sequence');
+    const msgIdHeader = res.headers.get('X-Message-Id');
+    
+    return {
+      blob,
+      sequenceNumber: seqHeader ? parseInt(seqHeader, 10) : options?.sequenceNumber,
+      messageId: msgIdHeader || options?.messageId,
+    };
   }
 }
 

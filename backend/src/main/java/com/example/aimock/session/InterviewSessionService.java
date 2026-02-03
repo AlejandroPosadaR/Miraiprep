@@ -4,13 +4,17 @@ import com.example.aimock.auth.user.UserRepository;
 import com.example.aimock.exception.ResourceNotFoundException;
 import com.example.aimock.exception.ValidationException;
 import com.example.aimock.session.dto.CreateInterviewSessionRequest;
+import com.example.aimock.session.dto.PaginatedSessionsResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.UUID;
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +46,8 @@ public class InterviewSessionService {
                 .title(request.getTitle())
                 .interviewType(request.getInterviewType().trim())
                 .userId(request.getUserId())
+                .experienceYears(request.getExperienceYears() != null ? request.getExperienceYears() : 2)
+                .jobDescription(request.getJobDescription())
                 .status(Status.PENDING)
                 .build();
 
@@ -91,8 +97,56 @@ public class InterviewSessionService {
         return interviewSessionRepository.save(session);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<InterviewSession> getInterviewSessions(UUID userId) {
         return interviewSessionRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public PaginatedSessionsResponse getInterviewSessionsPaginated(UUID userId, String cursor, int limit) {
+        List<InterviewSession> sessions;
+        
+        if (cursor != null && !cursor.isEmpty()) {
+            LocalDateTime cursorDate = decodeCursor(cursor);
+            sessions = interviewSessionRepository.findByUserIdWithCursor(
+                    userId, cursorDate, PageRequest.of(0, limit + 1));
+        } else {
+            sessions = interviewSessionRepository.findByUserIdPaginated(
+                    userId, PageRequest.of(0, limit + 1));
+        }
+
+        boolean hasMore = sessions.size() > limit;
+        if (hasMore) {
+            sessions = sessions.subList(0, limit);
+        }
+
+        String nextCursor = null;
+        if (hasMore && !sessions.isEmpty()) {
+            InterviewSession lastSession = sessions.get(sessions.size() - 1);
+            nextCursor = encodeCursor(lastSession.getCreatedAt());
+        }
+
+        int totalCount = interviewSessionRepository.countByUserId(userId);
+
+        return PaginatedSessionsResponse.builder()
+                .sessions(sessions)
+                .nextCursor(nextCursor)
+                .hasMore(hasMore)
+                .totalCount(totalCount)
+                .build();
+    }
+
+    private String encodeCursor(LocalDateTime dateTime) {
+        String formatted = dateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        return Base64.getUrlEncoder().encodeToString(formatted.getBytes());
+    }
+
+    private LocalDateTime decodeCursor(String cursor) {
+        try {
+            String decoded = new String(Base64.getUrlDecoder().decode(cursor));
+            return LocalDateTime.parse(decoded, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        } catch (Exception e) {
+            throw new ValidationException("Invalid cursor format");
+        }
     }
 }

@@ -1,6 +1,7 @@
 package com.example.aimock.websocket;
 
 import com.example.aimock.websocket.dto.SessionTopicEvent;
+import io.micrometer.core.instrument.Counter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
@@ -12,10 +13,13 @@ import java.util.UUID;
 public class SessionTopicPublisher {
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final Counter websocketMessagesSent;
 
     public void publish(SessionTopicEvent event) {
         String topic = "/topic/session/" + event.sessionId();
         messagingTemplate.convertAndSend(topic, event);
+        // Track WebSocket messages sent
+        websocketMessagesSent.increment();
     }
 
     public void accepted(UUID sessionId, UUID userMessageId, UUID interviewerMessageId) {

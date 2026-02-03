@@ -133,4 +133,120 @@ class InterviewSessionControllerIntegrationTest extends AbstractControllerIntegr
         }
     }
 
+    @Nested
+    @DisplayName("GET /api/v1/interview-sessions/paginated")
+    class Paginated {
+        @Test
+        void returns200WithPaginatedSessions() throws Exception {
+            mockMvc.perform(get("/api/v1/interview-sessions/paginated")
+                            .header("Authorization", "Bearer " + token)
+                            .param("limit", "10"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.sessions").isArray())
+                    .andExpect(jsonPath("$.sessions[0].id").value(ownedSession.getId().toString()))
+                    .andExpect(jsonPath("$.totalCount").isNumber())
+                    .andExpect(jsonPath("$.hasMore").isBoolean());
+        }
+
+        @Test
+        void returns200WithLimitedResults() throws Exception {
+            sessionRepository.save(InterviewSession.builder()
+                    .userId(testUser.getId())
+                    .title("Session 2")
+                    .interviewType("BEHAVIORAL")
+                    .status(Status.PENDING)
+                    .build());
+            sessionRepository.save(InterviewSession.builder()
+                    .userId(testUser.getId())
+                    .title("Session 3")
+                    .interviewType("OOP")
+                    .status(Status.PENDING)
+                    .build());
+
+            mockMvc.perform(get("/api/v1/interview-sessions/paginated")
+                            .header("Authorization", "Bearer " + token)
+                            .param("limit", "2"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.sessions").isArray())
+                    .andExpect(jsonPath("$.sessions.length()").value(2))
+                    .andExpect(jsonPath("$.hasMore").value(true))
+                    .andExpect(jsonPath("$.nextCursor").isNotEmpty());
+        }
+
+        @Test
+        void returns401WhenUnauthenticated() throws Exception {
+            mockMvc.perform(get("/api/v1/interview-sessions/paginated"))
+                    .andExpect(status().is4xxClientError());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/v1/interview-sessions/{id}")
+    class GetById {
+        @Test
+        void returns200WhenOwned() throws Exception {
+            mockMvc.perform(get("/api/v1/interview-sessions/" + ownedSession.getId())
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(ownedSession.getId().toString()))
+                    .andExpect(jsonPath("$.title").value("My Session"));
+        }
+
+        @Test
+        void returns404WhenNotOwned() throws Exception {
+            InterviewSession otherSession = sessionRepository.save(InterviewSession.builder()
+                    .userId(UUID.randomUUID())
+                    .title("Other User Session")
+                    .interviewType("TECH")
+                    .status(Status.STARTED)
+                    .build());
+
+            mockMvc.perform(get("/api/v1/interview-sessions/" + otherSession.getId())
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isNotFound());
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/v1/interview-sessions with job description")
+    class CreateWithJobDescription {
+        @Test
+        void returns200AndSavesJobDescription() throws Exception {
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "userId", testUser.getId().toString(),
+                    "title", "Backend Developer Interview",
+                    "interviewType", "TECHNICAL",
+                    "experienceYears", 5,
+                    "jobDescription", "We are looking for a senior Java developer with Spring Boot experience."
+            ));
+
+            mockMvc.perform(post("/api/v1/interview-sessions")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.title").value("Backend Developer Interview"))
+                    .andExpect(jsonPath("$.jobDescription").value("We are looking for a senior Java developer with Spring Boot experience."))
+                    .andExpect(jsonPath("$.experienceYears").value(5));
+        }
+
+        @Test
+        void returns200WithNullJobDescription() throws Exception {
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "userId", testUser.getId().toString(),
+                    "title", "Quick Interview",
+                    "interviewType", "BEHAVIORAL",
+                    "experienceYears", 2
+            ));
+
+            mockMvc.perform(post("/api/v1/interview-sessions")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.title").value("Quick Interview"))
+                    .andExpect(jsonPath("$.jobDescription").doesNotExist());
+        }
+    }
+
 }
