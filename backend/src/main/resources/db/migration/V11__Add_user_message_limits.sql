@@ -1,5 +1,5 @@
 -- Add tier system and message limits to users table
--- Default tier is FREE with 20 messages
+-- Default tier is FREE with 30 messages
 
 -- Add tier column (FREE, PRO, ENTERPRISE)
 ALTER TABLE users ADD COLUMN tier VARCHAR(20) NOT NULL DEFAULT 'FREE';
@@ -8,7 +8,7 @@ ALTER TABLE users ADD COLUMN tier VARCHAR(20) NOT NULL DEFAULT 'FREE';
 ALTER TABLE users ADD COLUMN message_count INTEGER NOT NULL DEFAULT 0;
 
 -- Add message limit based on tier (can be overridden per user)
-ALTER TABLE users ADD COLUMN message_limit INTEGER NOT NULL DEFAULT 20;
+ALTER TABLE users ADD COLUMN message_limit INTEGER NOT NULL DEFAULT 30;
 
 -- Add index for quick tier lookups
 CREATE INDEX idx_users_tier ON users(tier);

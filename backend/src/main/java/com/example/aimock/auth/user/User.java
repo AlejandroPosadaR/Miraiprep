@@ -88,7 +88,7 @@ public class User {
      */
     @Column(name = "message_limit", nullable = false)
     @Builder.Default
-    private Integer messageLimit = 20;
+    private Integer messageLimit = 30;
 
     /**
      * Check if user has remaining messages

@@ -154,7 +154,7 @@ class AuthControllerIntegrationTest extends AbstractControllerIntegrationTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.userId").value(testUser.getId().toString()))
                     .andExpect(jsonPath("$.email").value(TEST_EMAIL))
-                    .andExpect(jsonPath("$.username").value(TEST_EMAIL))
+                    .andExpect(jsonPath("$.username").value(TEST_USERNAME))
                     .andExpect(jsonPath("$.firstName").value("Test"))
                     .andExpect(jsonPath("$.lastName").value("User"));
         }
