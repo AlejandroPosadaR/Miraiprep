@@ -3,23 +3,23 @@ import { motion } from "framer-motion";
 const steps = [
   {
     number: "01",
-    title: "Choose your role",
-    description: "Select from 50+ job categories and customize difficulty level.",
+    title: "Start your session",
+    description: "Choose interview type (Technical, Behavioral, System Design, etc.) and set your experience level. Our AI adapts questions to match your skill level.",
   },
   {
     number: "02", 
-    title: "Practice interview",
-    description: "Engage in realistic AI-powered mock interviews with voice or text.",
+    title: "Real-time conversation",
+    description: "Chat via WebSocket with GPT-4o-mini. Your messages are queued via AWS SQS, processed asynchronously by our AI worker, and streamed back token-by-token for instant responses.",
   },
   {
     number: "03",
-    title: "Get feedback",
-    description: "Receive detailed analysis with actionable improvement tips.",
+    title: "Voice interaction",
+    description: "Use OpenAI Whisper for speech-to-text and OpenAI TTS for text-to-speech. Experience natural voice conversations with the AI interviewer.",
   },
   {
     number: "04",
-    title: "Track & improve",
-    description: "Monitor your progress and watch your confidence grow.",
+    title: "AI-powered evaluation",
+    description: "Get comprehensive feedback with scores across knowledge, communication, problem-solving, and technical depth. All data stored securely in PostgreSQL on AWS RDS.",
   },
 ];
 
@@ -91,8 +91,11 @@ const HowItWorks = () => {
             >
               <span className="text-sm font-medium text-primary mb-4 block">HOW IT WORKS</span>
               <h2 className="text-4xl md:text-5xl font-display font-bold mb-6">
-                Four steps to your <span className="text-gradient">dream job</span>
+                Powered by <span className="text-gradient">real-time AI</span>
               </h2>
+              <p className="text-muted-foreground text-lg mb-8">
+                Built with WebSocket streaming, AWS SQS queuing, and OpenAI GPT-4o-mini for instant, realistic interview experiences.
+              </p>
             </motion.div>
 
             <div className="space-y-8">
