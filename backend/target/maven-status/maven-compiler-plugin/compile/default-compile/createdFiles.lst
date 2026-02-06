@@ -48,6 +48,7 @@ com/example/aimock/messages/model/MessageStatus.class
 com/example/aimock/ai/strategy/OOPInterviewStrategy.class
 com/example/aimock/session/dto/CreateInterviewSessionRequest.class
 com/example/aimock/auth/user/User$UserBuilder.class
+com/example/aimock/exception/MessageLimitExceededException.class
 com/example/aimock/exception/ConflictException.class
 com/example/aimock/session/Status.class
 com/example/aimock/session/dto/PaginatedSessionsResponse.class

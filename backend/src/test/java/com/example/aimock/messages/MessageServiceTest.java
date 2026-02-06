@@ -1,5 +1,7 @@
 package com.example.aimock.messages;
 
+import com.example.aimock.auth.user.User;
+import com.example.aimock.auth.user.UserRepository;
 import com.example.aimock.messages.dto.MessageCreationResult;
 import com.example.aimock.messages.model.Message;
 import com.example.aimock.messages.model.MessageRole;
@@ -37,6 +39,9 @@ class MessageServiceTest {
     private SQSService sqsService;
 
     @Mock
+    private UserRepository userRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private MessageService messageService;
@@ -45,7 +50,7 @@ class MessageServiceTest {
 
     @BeforeEach
     void setUp() {
-        messageService = new MessageService(messageRepository, sessionRepository, sqsService, eventPublisher);
+        messageService = new MessageService(messageRepository, sessionRepository, userRepository, sqsService, eventPublisher);
         sessionId = UUID.randomUUID();
     }
 
@@ -112,6 +117,7 @@ class MessageServiceTest {
     class CreateUserMessageAndEnqueue {
         private UUID userId;
         private InterviewSession session;
+        private User user;
 
         @BeforeEach
         void setUp() {
@@ -123,6 +129,18 @@ class MessageServiceTest {
                     .interviewType("TECHNICAL")
                     .status(Status.STARTED)
                     .build();
+            user = User.builder()
+                    .id(userId)
+                    .email("test@example.com")
+                    .username("testuser")
+                    .password("password")
+                    .firstName("Test")
+                    .lastName("User")
+                    .tier("FREE")
+                    .messageCount(0)
+                    .messageLimit(30)
+                    .build();
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         }
 
         @Test
@@ -147,6 +165,7 @@ class MessageServiceTest {
             assertThat(result.getInterviewerMessageId()).isNotNull();
             verify(messageRepository, times(2)).save(any(Message.class));
             verify(sessionRepository).save(session);
+            verify(userRepository).save(user);
         }
 
         @Test
@@ -160,6 +179,7 @@ class MessageServiceTest {
             assertThatThrownBy(() -> messageService.createUserMessageAndEnqueue(
                     sessionId, userId, "Content", "key-1"))
                     .isInstanceOf(com.example.aimock.exception.ResourceNotFoundException.class);
+            verify(userRepository).findById(userId);
         }
 
         @Test
@@ -180,6 +200,7 @@ class MessageServiceTest {
             messageService.createUserMessageAndEnqueue(sessionId, userId, "Content", "key-1");
 
             verify(sessionRepository).save(argThat(s -> s.getNextSeq() > 0));
+            verify(userRepository).save(user);
         }
         
         @Test
@@ -203,6 +224,7 @@ class MessageServiceTest {
                     m.getRole() == MessageRole.USER && 
                     "unique-key-123".equals(m.getIdempotencyKey())
             ));
+            verify(userRepository).save(user);
         }
     }
     
@@ -211,6 +233,7 @@ class MessageServiceTest {
     class Idempotency {
         private UUID userId;
         private InterviewSession session;
+        private User user;
 
         @BeforeEach
         void setUp() {
@@ -222,6 +245,18 @@ class MessageServiceTest {
                     .interviewType("TECHNICAL")
                     .status(Status.STARTED)
                     .build();
+            user = User.builder()
+                    .id(userId)
+                    .email("test@example.com")
+                    .username("testuser")
+                    .password("password")
+                    .firstName("Test")
+                    .lastName("User")
+                    .tier("FREE")
+                    .messageCount(0)
+                    .messageLimit(30)
+                    .build();
+            when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         }
         
         @Test
@@ -252,6 +287,9 @@ class MessageServiceTest {
             // Should NOT create new messages
             verify(messageRepository, never()).save(any(Message.class));
             verify(sessionRepository, never()).findByIdAndUserIdForUpdate(any(), any());
+            // Message limit check still happens before idempotency check
+            verify(userRepository).findById(userId);
+            verify(userRepository, never()).save(any(User.class));
         }
         
         @Test
@@ -288,6 +326,9 @@ class MessageServiceTest {
             
             // Should have acquired lock (to double-check)
             verify(sessionRepository).findByIdAndUserIdForUpdate(sessionId, userId);
+            // Message limit check still happens before idempotency check
+            verify(userRepository).findById(userId);
+            verify(userRepository, never()).save(any(User.class));
         }
         
         @Test
@@ -310,6 +351,7 @@ class MessageServiceTest {
             
             // Should NOT check for existing (null key)
             verify(messageRepository, never()).findBySessionIdAndIdempotencyKey(any(), any());
+            verify(userRepository).save(user);
         }
         
         @Test
@@ -332,6 +374,7 @@ class MessageServiceTest {
             
             // Should NOT check for existing (blank key)
             verify(messageRepository, never()).findBySessionIdAndIdempotencyKey(any(), any());
+            verify(userRepository).save(user);
         }
         
         @Test
@@ -356,6 +399,7 @@ class MessageServiceTest {
 
             assertThat(result1.getUserMessageId()).isNotEqualTo(result2.getUserMessageId());
             verify(messageRepository, times(4)).save(any(Message.class)); // 2 user + 2 interviewer
+            verify(userRepository, times(2)).save(user); // User message count incremented twice
         }
     }
 }

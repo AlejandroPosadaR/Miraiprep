@@ -11,6 +11,7 @@ import InterviewDemo from "./pages/InterviewDemo";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -64,6 +65,7 @@ function AppRoutes() {
       <Route path="/" element={<Index />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/interview-demo" element={<InterviewDemo />} />
+      <Route path="/terms" element={<Terms />} />
 
       {/* Protected: live interview (uses backend session + WebSocket) */}
       <Route

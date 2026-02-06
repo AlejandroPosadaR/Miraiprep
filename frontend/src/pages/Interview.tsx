@@ -94,6 +94,14 @@ type SessionTopicEvent =
       interviewerMessageId: string;
       error?: string;
       messageStatus?: string;
+    }
+  | {
+      type: "message_limit_exceeded";
+      sessionId: string;
+      messageLimit: number;
+      messageCount: number;
+      tier: string;
+      error?: string;
     };
 
 export default function Interview() {
@@ -110,6 +118,7 @@ export default function Interview() {
   const [ending, setEnding] = useState(false);
   const [connected, setConnected] = useState(false);
   const [didShowSttUnsupportedToast, setDidShowSttUnsupportedToast] = useState(false);
+  const [messageLimitReached, setMessageLimitReached] = useState(false);
   const [didShowTtsUnsupportedToast, setDidShowTtsUnsupportedToast] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [useOpenAITts, setUseOpenAITts] = useState(true); // Default to OpenAI TTS (high quality)
@@ -140,7 +149,7 @@ export default function Interview() {
   const isPreloadingRef = useRef(false);
   // Queue for text chunks with sequence info for ordered playback
   const pendingTtsQueueRef = useRef<{ text: string; sequenceNumber: number; messageId?: string }[]>([]);
-  const isProcessingTtsQueueRef = useRef(false); // Flag to ensure sequential processing
+  const isProcessingTtsQueueRef = useRef(false);
   const ttsSequenceCounterRef = useRef(0); // Counter to assign sequence numbers
   // Track the last displayed STT value to avoid unnecessary updates - MUST be defined before hooks that use it
   const lastDisplayedRef = useRef<string>("");
@@ -178,7 +187,6 @@ export default function Interview() {
   // Select active STT provider
   const activeStt = useOpenAIStt && openaiStt.isSupported ? openaiStt : webStt;
   
-  // Unified STT interface
   const sttSupported = useOpenAIStt ? openaiStt.isSupported : webStt.isSupported;
   const isListening = useOpenAIStt ? openaiStt.isListening : webStt.isListening;
   const isProcessing = useOpenAIStt ? openaiStt.isProcessing : false;
@@ -187,7 +195,6 @@ export default function Interview() {
     : (webStt.finalTranscript || (webStt.isListening ? webStt.interimTranscript : ""));
   const sttError = useOpenAIStt ? openaiStt.error : webStt.error;
   
-  // Unified STT controls that work with both providers
   const startListening = useCallback(() => {
     if (useOpenAIStt) {
       void openaiStt.start();
@@ -322,7 +329,6 @@ export default function Interview() {
     }
   }, []);
 
-  // Process next item in TTS queue - used by audio ended callbacks
   const processNextInQueueRef = useRef<() => void>(() => {});
   const processTtsQueueRef = useRef<() => Promise<void>>(async () => {});
   
@@ -340,7 +346,6 @@ export default function Interview() {
     } else {
       currentAudioRef.current = null;
       ttsQueueActiveRef.current = false;
-      // Process text queue if there's more
       if (ttsQueueRef.current.length > 0) {
         void processTtsQueueRef.current();
       }
@@ -351,12 +356,9 @@ export default function Interview() {
     processNextInQueueRef.current = processNextInQueue;
   }, [processNextInQueue]);
 
-  // Process TTS text queue sequentially to ensure correct order
   const processTtsTextQueue = useCallback(async () => {
-    // If already processing, wait
     if (isProcessingTtsQueueRef.current) return;
     
-    // If queue is empty, nothing to do
     if (pendingTtsQueueRef.current.length === 0) return;
     
     isProcessingTtsQueueRef.current = true;
@@ -378,10 +380,8 @@ export default function Interview() {
         const audioUrl = URL.createObjectURL(result.blob);
         const audio = new Audio(audioUrl);
         
-        // Store sequence info on audio element for debugging
         (audio as HTMLAudioElement & { _sequence?: number })._sequence = item.sequenceNumber;
         
-        // Set up seamless transition - when this audio ends, play next in queue
         audio.addEventListener('ended', () => {
           URL.revokeObjectURL(audioUrl);
           processNextInQueueRef.current();
@@ -394,34 +394,28 @@ export default function Interview() {
           processNextInQueueRef.current();
         });
 
-        // If nothing is playing, start immediately
         if (!currentAudioRef.current) {
           currentAudioRef.current = audio;
           await audio.play();
         } else {
-          // Queue it to play seamlessly after current audio ends
           audioQueueRef.current.push(audio);
         }
       } catch (error) {
         console.error("TTS audio queue error:", error);
-        // Continue processing next item even if this one failed
       }
     }
     
     isProcessingTtsQueueRef.current = false;
   }, []);
 
-  // Seamless audio queue for OpenAI TTS - queues text with sequence number and processes sequentially
   const speakWithAudioQueue = useCallback((text: string, messageId?: string) => {
     // Assign sequence number to maintain order
     const sequenceNumber = ++ttsSequenceCounterRef.current;
     // Add to pending queue with sequence info
     pendingTtsQueueRef.current.push({ text, sequenceNumber, messageId });
-    // Start processing if not already processing
     void processTtsTextQueue();
   }, [processTtsTextQueue]);
 
-  // Update ref when speakWithAudioQueue changes
   useEffect(() => {
     speakWithAudioQueueRef.current = speakWithAudioQueue;
   }, [speakWithAudioQueue]);
@@ -430,9 +424,7 @@ export default function Interview() {
     if (ttsQueueActiveRef.current) return;
     if (!ttsEnabledRef.current || !ttsSupportedRef.current) return;
     
-    // For OpenAI TTS, check if audio is already playing or queued
     if (useOpenAITtsRef.current && (currentAudioRef.current || audioQueueRef.current.length > 0)) {
-      // Audio is playing or queued, process text queue when current audio ends
       return;
     }
     
@@ -448,7 +440,6 @@ export default function Interview() {
 
   useEffect(() => {
     ttsOnEndRef.current = () => {
-      // For Web Speech API, process next in queue
       if (!useOpenAITtsRef.current) {
         ttsQueueActiveRef.current = false;
         processTtsQueue();
@@ -462,12 +453,9 @@ export default function Interview() {
       const cleaned = text.trim();
       if (!cleaned) return;
       
-      // For OpenAI TTS, start preloading immediately even if audio is playing
       if (useOpenAITtsRef.current && openaiTtsRef.current.isSupported) {
-        // Start preloading this chunk immediately (will queue if audio is playing)
         void speakWithAudioQueue(cleaned, messageId);
       } else {
-        // For Web Speech API, use the queue system
         ttsQueueRef.current.push(cleaned);
         processTtsQueue();
       }
@@ -496,7 +484,6 @@ export default function Interview() {
   const speakAiResponse = useCallback(
     (text: string, messageId: string) => {
       if (!ttsSupportedRef.current || !ttsEnabledRef.current || !text.trim()) return;
-      // Don't speak the same message twice
       if (spokenMessagesRef.current.has(messageId)) return;
       spokenMessagesRef.current.add(messageId);
       speakText(text);
@@ -504,7 +491,6 @@ export default function Interview() {
     [speakText]
   );
 
-  // Keep these callbacks in refs so the WebSocket connection effect does not reconnect on re-renders.
   const speakAiResponseRef = useRef(speakAiResponse);
   useEffect(() => {
     speakAiResponseRef.current = speakAiResponse;
@@ -551,7 +537,6 @@ export default function Interview() {
         setInput(combined.trim());
       }
     } else {
-      // When stopped listening, only use finalTranscript (interim should be cleared)
       const final = webStt.finalTranscript || "";
       if (final !== lastDisplayedRef.current) {
         lastDisplayedRef.current = final;
@@ -579,7 +564,6 @@ export default function Interview() {
     });
   }, [sttError, stopListening, toast]);
 
-  // Stop TTS when user starts speaking (to avoid overlap)
   // Use ref to avoid dependency issues
   const cancelSpeechRef = useRef(cancelSpeech);
   useEffect(() => {
@@ -602,8 +586,8 @@ export default function Interview() {
       } catch (e) {
         if (!cancelled) {
           toast({
-            title: "Failed to load messages",
-            description: e instanceof Error ? e.message : "Unknown error",
+            title: "Couldn't load messages",
+            description: e instanceof Error ? e.message : undefined,
             variant: "destructive",
           });
         }
@@ -625,7 +609,7 @@ export default function Interview() {
         const sessionData = await api.getInterviewSession(sessionId);
         if (!cancelled) setSession(sessionData);
       } catch {
-        // Session info is optional, don't show error
+        // Session info is optional, ignore errors
       }
     })();
     return () => { cancelled = true; };
@@ -651,7 +635,7 @@ export default function Interview() {
         const list = await api.getMessages(sessionId, { limit: 200 });
         setMessages(list);
       } catch {
-        // don't toast spam; UI already has the content from WS
+        // Failed to sync messages, ignore and continue
       }
     },
     [sessionId]
@@ -750,7 +734,6 @@ export default function Interview() {
               // One and only one GET (per interviewer message) once the model is done.
               // Avoids hammering the backend during streaming.
               void syncOnceOnCompleteRef.current(evt.interviewerMessageId);
-              // If streaming TTS didn't speak the remainder, flush it now.
               if (ttsEnabledRef.current && ttsSupportedRef.current) {
                 const buffer = ttsStreamBufferRef.current.get(evt.interviewerMessageId) || "";
                 if (buffer.trim()) {
@@ -775,7 +758,18 @@ export default function Interview() {
                     : m
                 )
               );
-              toast({ title: "AI failed", description: evt.error ?? "Unknown error", variant: "destructive" });
+              toast({ title: "AI response error", description: evt.error ?? undefined, variant: "destructive" });
+            }
+
+            if (evt.type === "message_limit_exceeded") {
+              // Remove the optimistic message since it wasn't accepted
+              setMessages((prev) => prev.filter((m) => !m.id.startsWith("opt-")));
+              setMessageLimitReached(true);
+              toast({ 
+                title: "Message limit reached", 
+                description: `You have used ${evt.messageCount} of ${evt.messageLimit} messages on the ${evt.tier} tier. Upgrade to continue.`,
+                variant: "destructive" 
+              });
             }
           } catch {
             // ignore non-JSON frames
@@ -791,7 +785,6 @@ export default function Interview() {
     c.activate();
     clientRef.current = c;
     return () => {
-      // Stop all speech when component unmounts or session changes
       cancelSpeechRef.current();
       c.deactivate();
       clientRef.current = null;
@@ -808,7 +801,6 @@ export default function Interview() {
     setSending(true);
     setInput("");
     lastDisplayedRef.current = ""; // Clear the tracking ref
-    // Keep the mic UI clean after sending.
     sttActiveRef.current = false;
     void stopListening();
     resetStt();
@@ -845,8 +837,8 @@ export default function Interview() {
       });
     } catch (e) {
       toast({
-        title: "Send failed",
-        description: e instanceof Error ? e.message : "Unknown error",
+        title: "Couldn't send message",
+        description: e instanceof Error ? e.message : undefined,
         variant: "destructive",
       });
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
@@ -874,8 +866,8 @@ export default function Interview() {
       setShowEvaluation(true);
     } catch (e) {
       toast({
-        title: "Failed to end interview",
-        description: e instanceof Error ? e.message : "Unknown error",
+        title: "Couldn't end interview",
+        description: e instanceof Error ? e.message : undefined,
         variant: "destructive",
       });
       navigate("/dashboard");
@@ -999,6 +991,7 @@ export default function Interview() {
           sttSupported={sttSupported}
           useOpenAIStt={useOpenAIStt}
           didShowSttUnsupportedToast={didShowSttUnsupportedToast}
+          messageLimitReached={messageLimitReached}
           onInputChange={(value) => setInput(value)}
           onSend={sendMessage}
           onMicClick={async () => {

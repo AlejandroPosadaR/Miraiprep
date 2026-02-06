@@ -1,5 +1,8 @@
 package com.example.aimock.messages;
 
+import com.example.aimock.auth.user.User;
+import com.example.aimock.auth.user.UserRepository;
+import com.example.aimock.exception.MessageLimitExceededException;
 import com.example.aimock.exception.ResourceNotFoundException;
 import com.example.aimock.messages.dto.MessageCreationResult;
 import com.example.aimock.messages.events.AiJobRequestedEvent;
@@ -19,41 +22,6 @@ import java.util.stream.Collectors;
 
 /**
  * Service for message operations with idempotent, ordered message append.
- * 
- * <h3>How Idempotency Works</h3>
- * <pre>
- * ┌─────────────────────────────────────────────────────────────────────────┐
- * │                    createUserMessageAndEnqueue()                        │
- * ├─────────────────────────────────────────────────────────────────────────┤
- * │ 1. FAST PATH: Check idempotency (no lock)                              │
- * │    └─ If message exists → return existing IDs immediately              │
- * │                                                                         │
- * │ 2. SLOW PATH: Acquire pessimistic lock on session row                  │
- * │    └─ SELECT ... FOR UPDATE on interview_sessions                      │
- * │    └─ This BLOCKS concurrent requests for same session                 │
- * │                                                                         │
- * │ 3. DOUBLE-CHECK: Re-verify idempotency under lock                      │
- * │    └─ Another request may have created it while we waited              │
- * │                                                                         │
- * │ 4. ALLOCATE: Get next sequence numbers atomically                      │
- * │    └─ userSeq = session.allocateSeq()     (e.g., 5)                    │
- * │    └─ interviewerSeq = session.allocateSeq() (e.g., 6)                 │
- * │                                                                         │
- * │ 5. INSERT: Create messages with assigned sequences                      │
- * │    └─ USER message (seq=5, idempotencyKey="abc123")                    │
- * │    └─ INTERVIEWER placeholder (seq=6)                                  │
- * │                                                                         │
- * │ 6. COMMIT: Release lock, trigger AI job                                │
- * └─────────────────────────────────────────────────────────────────────────┘
- * </pre>
- * 
- * <h3>Concurrency Guarantees</h3>
- * <ul>
- *   <li>Messages are always in correct order (monotonic seq per session)</li>
- *   <li>Duplicate requests return existing message (idempotency key)</li>
- *   <li>No lost messages under concurrent requests</li>
- *   <li>No duplicate AI jobs for the same user message</li>
- * </ul>
  */
 @Service
 @RequiredArgsConstructor
@@ -62,6 +30,7 @@ public class MessageService {
 
     private final MessageRepository messageRepository;
     private final InterviewSessionRepository sessionRepository;
+    private final UserRepository userRepository;
     private final SQSService sqsService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -75,15 +44,7 @@ public class MessageService {
     }
 
     /**
-     * Creates a user message and enqueues AI processing, with idempotency guarantees.
-     * 
-     * @param sessionId       The interview session ID
-     * @param userId          The user ID (for authorization)
-     * @param content         The message content
-     * @param idempotencyKey  Client-provided key for deduplication (should be UUID v4)
-     * @return MessageCreationResult containing user and interviewer message IDs
-     * 
-     * @throws ResourceNotFoundException if session not found or doesn't belong to user
+     * Creates a user message and enqueues AI processing.
      */
     @Transactional
     public MessageCreationResult createUserMessageAndEnqueue(
@@ -92,10 +53,19 @@ public class MessageService {
             String content,
             String idempotencyKey) {
         
-        // ═══════════════════════════════════════════════════════════════════
-        // STEP 1: FAST PATH - Check for existing message without lock
-        // ═══════════════════════════════════════════════════════════════════
-        // This avoids acquiring a lock for retry requests (common case)
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+        
+        if (!user.hasMessagesRemaining()) {
+            log.warn("Message limit exceeded for user: userId={}, tier={}, count={}, limit={}",
+                    userId, user.getTier(), user.getMessageCount(), user.getMessageLimit());
+            throw new MessageLimitExceededException(
+                    user.getMessageLimit(), 
+                    user.getMessageCount(), 
+                    user.getTier()
+            );
+        }
+        
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             Optional<MessageCreationResult> existing = checkIdempotency(sessionId, idempotencyKey);
             if (existing.isPresent()) {
@@ -105,22 +75,12 @@ public class MessageService {
             }
         }
         
-        // ═══════════════════════════════════════════════════════════════════
-        // STEP 2: ACQUIRE PESSIMISTIC LOCK on session row
-        // ═══════════════════════════════════════════════════════════════════
-        // SELECT ... FOR UPDATE locks the row until transaction commits.
-        // Other requests for the SAME session will WAIT here.
-        // Requests for DIFFERENT sessions proceed in parallel.
         InterviewSession session = sessionRepository
             .findByIdAndUserIdForUpdate(sessionId, userId)
             .orElseThrow(() -> new ResourceNotFoundException("Session", "id", sessionId));
         
         log.debug("Acquired lock on session: sessionId={}", sessionId);
         
-        // ═══════════════════════════════════════════════════════════════════
-        // STEP 3: DOUBLE-CHECK idempotency under lock
-        // ═══════════════════════════════════════════════════════════════════
-        // Another request may have created the message while we waited for lock
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             Optional<MessageCreationResult> existing = checkIdempotency(sessionId, idempotencyKey);
             if (existing.isPresent()) {
@@ -130,35 +90,25 @@ public class MessageService {
             }
         }
         
-        // ═══════════════════════════════════════════════════════════════════
-        // STEP 4: ALLOCATE sequence numbers atomically
-        // ═══════════════════════════════════════════════════════════════════
-        // Because we hold the lock, no other request can allocate the same seq
         long userSeq = session.allocateSeq();
         long interviewerSeq = session.allocateSeq();
         
         log.debug("Allocated sequences: userSeq={}, interviewerSeq={}", userSeq, interviewerSeq);
         
-        // ═══════════════════════════════════════════════════════════════════
-        // STEP 5: CREATE messages with assigned sequences
-        // ═══════════════════════════════════════════════════════════════════
         Message userMessage = Message.user(content, sessionId, userSeq, idempotencyKey);
         userMessage = messageRepository.save(userMessage);
         
         Message interviewerPlaceholder = Message.interviewer("", sessionId, interviewerSeq);
         interviewerPlaceholder = messageRepository.save(interviewerPlaceholder);
         
-        // Update session with new nextSeq
         sessionRepository.save(session);
         
-        log.info("Created messages: userMessageId={}, interviewerMessageId={}, sessionId={}", 
-                userMessage.getId(), interviewerPlaceholder.getId(), sessionId);
+        user.incrementMessageCount();
+        userRepository.save(user);
         
-        // ═══════════════════════════════════════════════════════════════════
-        // STEP 6: TRIGGER AI job after commit
-        // ═══════════════════════════════════════════════════════════════════
-        // Event is published inside transaction, but listener runs AFTER_COMMIT
-        // This ensures we don't trigger AI job if transaction rolls back
+        log.info("Created messages: userMessageId={}, interviewerMessageId={}, sessionId={}, remainingMessages={}", 
+                userMessage.getId(), interviewerPlaceholder.getId(), sessionId, user.getRemainingMessages());
+        
         eventPublisher.publishEvent(new AiJobRequestedEvent(
                 interviewerPlaceholder.getId(),
                 sessionId,
@@ -170,7 +120,6 @@ public class MessageService {
     
     /**
      * Check if a message with this idempotency key already exists.
-     * Returns the existing message IDs if found.
      */
     private Optional<MessageCreationResult> checkIdempotency(UUID sessionId, String idempotencyKey) {
         return messageRepository.findBySessionIdAndIdempotencyKey(sessionId, idempotencyKey)

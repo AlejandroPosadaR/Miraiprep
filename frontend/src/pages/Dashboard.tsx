@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import {
   LogOut,
-  User,
   Play,
   Clock,
   Trophy,
@@ -19,6 +18,8 @@ import {
   TrendingUp,
   TrendingDown,
   CheckCircle2,
+  AlertCircle,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,44 +35,23 @@ import { useToast } from "@/hooks/use-toast";
 
 const INTERVIEW_TYPES = [
   {
-    title: "OOP Concepts",
+    title: "OOP",
     interviewType: "OOP",
-    description: "Object-oriented programming principles",
+    description: "Object-oriented programming concepts and principles",
     icon: Target,
     color: "from-violet-500 to-purple-600",
   },
   {
-    title: "Spring Boot",
+    title: "Backend",
     interviewType: "SPRING_BOOT",
-    description: "Java backend with Spring Boot (APIs, JPA, security)",
+    description: "Spring Boot, APIs, databases, and backend architecture",
     icon: Layers,
     color: "from-green-500 to-emerald-600",
   },
   {
-    title: "System Design",
-    interviewType: "SYSTEM_DESIGN",
-    description: "Architecture and design patterns",
-    icon: Sparkles,
-    color: "from-blue-500 to-cyan-600",
-  },
-  {
-    title: "JavaScript / React",
-    interviewType: "JAVASCRIPT_REACT",
-    description: "Frontend fundamentals, hooks, performance, TypeScript",
-    icon: MessageSquare,
-    color: "from-amber-500 to-orange-600",
-  },
-  {
-    title: "Behavioral",
-    interviewType: "BEHAVIORAL",
-    description: "Soft skills and situational questions",
-    icon: User,
-    color: "from-emerald-500 to-teal-600",
-  },
-  {
     title: "Fullstack",
     interviewType: "FULLSTACK",
-    description: "End-to-end system thinking (FE + BE + delivery)",
+    description: "End-to-end system design and implementation",
     icon: Brain,
     color: "from-fuchsia-500 to-pink-600",
   },
@@ -148,12 +128,11 @@ export default function Dashboard() {
         experienceYears,
         jobDescription: jobDescription.trim() || undefined,
       });
-      toast({ title: "Session started", description: "Redirecting to interview…" });
       navigate(`/interview/${session.id}`);
     } catch (e) {
       toast({
-        title: "Failed to start session",
-        description: e instanceof Error ? e.message : "Something went wrong",
+        title: "Couldn't start session",
+        description: e instanceof Error ? e.message : undefined,
         variant: "destructive",
       });
     } finally {
@@ -205,8 +184,8 @@ export default function Dashboard() {
           ));
         } catch (e) {
           toast({
-            title: "Failed to load evaluation",
-            description: e instanceof Error ? e.message : "Something went wrong",
+            title: "Couldn't load evaluation",
+            description: e instanceof Error ? e.message : undefined,
             variant: "destructive",
           });
         } finally {
@@ -267,10 +246,10 @@ export default function Dashboard() {
         >
           <div>
             <h1 className="text-3xl font-bold">
-              Welcome back, {user?.firstName}! 👋
+              {user?.firstName}&apos;s Dashboard
             </h1>
             <p className="text-muted-foreground mt-2">
-              Ready to ace your next interview? Let&apos;s practice!
+              Practice interviews and track your progress
             </p>
           </div>
 
@@ -342,6 +321,66 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Message Limit Banner */}
+          {user?.remainingMessages !== undefined && (
+            <Card className={`border-2 ${
+              user.remainingMessages === 0 
+                ? "border-red-500 bg-red-50 dark:bg-red-900/20" 
+                : user.remainingMessages <= 5 
+                  ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20"
+                  : "border-violet-500/30 bg-violet-50 dark:bg-violet-900/20"
+            }`}>
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    {user.remainingMessages === 0 ? (
+                      <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    ) : user.remainingMessages <= 5 ? (
+                      <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    ) : (
+                      <Zap className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                    )}
+                    <div>
+                      <p className="font-medium">
+                        {user.remainingMessages === 0 
+                          ? "You've reached your message limit" 
+                          : `${user.remainingMessages} messages remaining`}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {user.tier === "FREE" ? (
+                          <>Free tier: {user.messageCount || 0}/{user.messageLimit || 20} messages used</>
+                        ) : (
+                          <>{user.tier} tier: {user.messageCount || 0}/{user.messageLimit} messages used</>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-32 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-500 ${
+                          user.remainingMessages === 0 
+                            ? "bg-red-500" 
+                            : user.remainingMessages <= 5 
+                              ? "bg-amber-500" 
+                              : "bg-violet-500"
+                        }`}
+                        style={{ width: `${((user.messageCount || 0) / (user.messageLimit || 20)) * 100}%` }}
+                      />
+                    </div>
+                    {user.remainingMessages === 0 && (
+                      <Link to="/pricing">
+                        <Button size="sm" className="bg-gradient-to-r from-violet-500 to-purple-600">
+                          Upgrade
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div>
             <h2 className="text-xl font-semibold mb-4">Start a Practice Session</h2>
