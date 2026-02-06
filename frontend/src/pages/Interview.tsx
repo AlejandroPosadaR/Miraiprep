@@ -609,6 +609,7 @@ export default function Interview() {
         const sessionData = await api.getInterviewSession(sessionId);
         if (!cancelled) setSession(sessionData);
       } catch {
+        // Session info is optional, ignore errors
       }
     })();
     return () => { cancelled = true; };
@@ -634,6 +635,7 @@ export default function Interview() {
         const list = await api.getMessages(sessionId, { limit: 200 });
         setMessages(list);
       } catch {
+        // Failed to sync messages, ignore and continue
       }
     },
     [sessionId]
