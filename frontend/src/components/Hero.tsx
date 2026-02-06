@@ -1,9 +1,48 @@
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { Button } from "./ui/button";
-import { ArrowRight, Play, Sparkles, Check } from "lucide-react";
+import { ArrowRight, Sparkles, Check, UserRound, Loader2, Github } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Hero = () => {
+  const { register } = useAuth();
+  const navigate = useNavigate();
+  const [isCreatingGuest, setIsCreatingGuest] = useState(false);
+
+  const handleTryAsGuest = async () => {
+    setIsCreatingGuest(true);
+    try {
+      const id = crypto.randomUUID().slice(0, 8);
+      await register({
+        email: `guest-${id}@miraiprep.com`,
+        username: `guest-${id}`,
+        password: `Guest@${id}!Xk`,
+        firstName: "Guest",
+        lastName: "User",
+      });
+      navigate("/dashboard");
+    } catch {
+      // If the random email collides (extremely unlikely), retry once
+      try {
+        const id2 = crypto.randomUUID().slice(0, 8);
+        await register({
+          email: `guest-${id2}@miraiprep.com`,
+          username: `guest-${id2}`,
+          password: `Guest@${id2}!Xk`,
+          firstName: "Guest",
+          lastName: "User",
+        });
+        navigate("/dashboard");
+      } catch {
+        // Fallback: send them to the register page
+        navigate("/register");
+      }
+    } finally {
+      setIsCreatingGuest(false);
+    }
+  };
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden px-6 pt-32 pb-20">
       {/* Background blobs */}
@@ -59,18 +98,51 @@ const Hero = () => {
                   <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>
-              <Link to="/interview-demo">
-                <Button variant="ghost" size="lg" className="group text-muted-foreground">
-                  <Play className="w-5 h-5 mr-2" />
-                  Watch Demo
-                </Button>
-              </Link>
+              <Button
+                variant="outline"
+                size="lg"
+                className="group border-primary/30 bg-primary/5 hover:bg-primary/10 text-foreground font-semibold"
+                onClick={handleTryAsGuest}
+                disabled={isCreatingGuest}
+              >
+                {isCreatingGuest ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <UserRound className="w-5 h-5 mr-2" />
+                )}
+                {isCreatingGuest ? "Setting up..." : "Try as Guest"}
+              </Button>
             </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.6 }}
+              transition={{ duration: 0.6, delay: 0.65 }}
+              className="mb-10"
+            >
+              <a
+                href="https://github.com/AlejandroPosadaR/Miraiprep"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-3 px-6 py-4 rounded-2xl bg-card border-2 border-border hover:border-primary/50 transition-all duration-300 group shadow-lg hover:shadow-xl"
+              >
+                <Github className="w-6 h-6 text-foreground group-hover:text-primary transition-colors" />
+                <div className="text-left">
+                  <div className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                    View on GitHub
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Open source • Star us ⭐
+                  </div>
+                </div>
+                <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+              </a>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.7 }}
               className="flex flex-wrap gap-4"
             >
               {["No credit card", "Unlimited practice", "Real-time feedback"].map((item, i) => (
