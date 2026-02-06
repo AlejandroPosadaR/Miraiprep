@@ -32,6 +32,7 @@
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/exception/ConflictException.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/exception/ErrorResponse.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/exception/GlobalExceptionHandler.java
+/Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/exception/MessageLimitExceededException.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/exception/ResourceNotFoundException.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/exception/UnauthorizedException.java
 /Users/masoko/Downloads/tempai/aiinter/backend/src/main/java/com/example/aimock/exception/ValidationException.java

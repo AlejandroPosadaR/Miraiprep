@@ -37,5 +37,9 @@ public class SessionTopicPublisher {
     public void aiFailed(UUID sessionId, UUID interviewerMessageId, String error) {
         publish(SessionTopicEvent.aiFailed(sessionId, interviewerMessageId, error));
     }
+
+    public void messageLimitExceeded(UUID sessionId, int messageLimit, int messageCount, String tier) {
+        publish(SessionTopicEvent.messageLimitExceeded(sessionId, messageLimit, messageCount, tier));
+    }
 }
 

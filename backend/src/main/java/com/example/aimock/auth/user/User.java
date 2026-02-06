@@ -68,4 +68,46 @@ public class User {
 
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
+
+    /**
+     * User subscription tier: FREE, PRO, ENTERPRISE
+     */
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private String tier = "FREE";
+
+    /**
+     * Total messages sent by user (USER role messages only, not AI responses)
+     */
+    @Column(name = "message_count", nullable = false)
+    @Builder.Default
+    private Integer messageCount = 0;
+
+    /**
+     * Maximum messages allowed for this user (based on tier or custom override)
+     */
+    @Column(name = "message_limit", nullable = false)
+    @Builder.Default
+    private Integer messageLimit = 20;
+
+    /**
+     * Check if user has remaining messages
+     */
+    public boolean hasMessagesRemaining() {
+        return messageCount < messageLimit;
+    }
+
+    /**
+     * Get remaining message count
+     */
+    public int getRemainingMessages() {
+        return Math.max(0, messageLimit - messageCount);
+    }
+
+    /**
+     * Increment message count (call after sending a message)
+     */
+    public void incrementMessageCount() {
+        this.messageCount++;
+    }
 }

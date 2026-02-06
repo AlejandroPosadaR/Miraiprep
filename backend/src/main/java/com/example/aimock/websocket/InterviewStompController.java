@@ -1,5 +1,6 @@
 package com.example.aimock.websocket;
 
+import com.example.aimock.exception.MessageLimitExceededException;
 import com.example.aimock.messages.dto.MessageCreationResult;
 import com.example.aimock.messages.MessageService;
 import com.example.aimock.websocket.dto.InterviewMessageRequest;
@@ -21,12 +22,23 @@ public class InterviewStompController {
     @MessageMapping("/interview/send")
     public void sendMessage(@Valid @Payload InterviewMessageRequest req) {
         log.debug("STOMP message: sessionId={}, userId={}", req.getSessionId(), req.getUserId());
-        MessageCreationResult result = messageService.createUserMessageAndEnqueue(
-                req.getSessionId(),
-                req.getUserId(),
-                req.getContent(),
-                req.getIdempotencyKey()
-        );
-        topicPublisher.accepted(req.getSessionId(), result.getUserMessageId(), result.getInterviewerMessageId());
+        try {
+            MessageCreationResult result = messageService.createUserMessageAndEnqueue(
+                    req.getSessionId(),
+                    req.getUserId(),
+                    req.getContent(),
+                    req.getIdempotencyKey()
+            );
+            topicPublisher.accepted(req.getSessionId(), result.getUserMessageId(), result.getInterviewerMessageId());
+        } catch (MessageLimitExceededException e) {
+            log.warn("Message limit exceeded for user in session: sessionId={}, userId={}", 
+                    req.getSessionId(), req.getUserId());
+            topicPublisher.messageLimitExceeded(
+                    req.getSessionId(),
+                    e.getMessageLimit(),
+                    e.getMessageCount(),
+                    e.getTier()
+            );
+        }
     }
 }

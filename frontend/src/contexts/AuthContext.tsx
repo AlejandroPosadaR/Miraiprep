@@ -8,6 +8,10 @@ export interface User {
   username: string;
   firstName: string;
   lastName: string;
+  tier?: string;
+  messageCount?: number;
+  messageLimit?: number;
+  remainingMessages?: number;
 }
 
 interface AuthContextType {
@@ -23,6 +27,8 @@ interface AuthContextType {
     lastName: string;
   }) => Promise<AuthResponse>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
+  decrementRemainingMessages: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,6 +52,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username: stored.username,
         firstName: stored.firstName,
         lastName: stored.lastName,
+        tier: stored.tier,
+        messageCount: stored.messageCount,
+        messageLimit: stored.messageLimit,
+        remainingMessages: stored.remainingMessages,
+      });
+      // Fetch fresh user data to get updated message count
+      api.getCurrentUser().then(freshUser => {
+        setUser({
+          userId: freshUser.userId,
+          email: freshUser.email,
+          username: freshUser.username,
+          firstName: freshUser.firstName,
+          lastName: freshUser.lastName,
+          tier: freshUser.tier,
+          messageCount: freshUser.messageCount,
+          messageLimit: freshUser.messageLimit,
+          remainingMessages: freshUser.remainingMessages,
+        });
+      }).catch(() => {
+        // If refresh fails, keep stored data
       });
     }
     setIsLoading(false);
@@ -66,6 +92,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username: res.username,
       firstName: res.firstName,
       lastName: res.lastName,
+      tier: res.tier,
+      messageCount: res.messageCount,
+      messageLimit: res.messageLimit,
+      remainingMessages: res.remainingMessages,
     });
     return res;
   };
@@ -84,6 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username: res.username,
       firstName: res.firstName,
       lastName: res.lastName,
+      tier: res.tier,
+      messageCount: res.messageCount,
+      messageLimit: res.messageLimit,
+      remainingMessages: res.remainingMessages,
     });
     return res;
   };
@@ -91,6 +125,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     api.logout();
     setUser(null);
+  };
+
+  const refreshUser = async () => {
+    try {
+      const freshUser = await api.getCurrentUser();
+      setUser({
+        userId: freshUser.userId,
+        email: freshUser.email,
+        username: freshUser.username,
+        firstName: freshUser.firstName,
+        lastName: freshUser.lastName,
+        tier: freshUser.tier,
+        messageCount: freshUser.messageCount,
+        messageLimit: freshUser.messageLimit,
+        remainingMessages: freshUser.remainingMessages,
+      });
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+    }
+  };
+
+  const decrementRemainingMessages = () => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const newRemaining = Math.max(0, (prev.remainingMessages || 0) - 1);
+      const newCount = (prev.messageCount || 0) + 1;
+      return {
+        ...prev,
+        remainingMessages: newRemaining,
+        messageCount: newCount,
+      };
+    });
   };
 
   return (
@@ -102,6 +168,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        refreshUser,
+        decrementRemainingMessages,
       }}
     >
       {children}

@@ -11,6 +11,10 @@ export interface AuthResponse {
   firstName: string;
   lastName: string;
   message?: string;
+  tier?: string;
+  messageCount?: number;
+  messageLimit?: number;
+  remainingMessages?: number;
 }
 
 export interface LoginRequest {
@@ -141,6 +145,10 @@ class ApiService {
           username: data.username,
           firstName: data.firstName,
           lastName: data.lastName,
+          tier: data.tier,
+          messageCount: data.messageCount,
+          messageLimit: data.messageLimit,
+          remainingMessages: data.remainingMessages,
         })
       );
     }
@@ -162,6 +170,10 @@ class ApiService {
           username: data.username,
           firstName: data.firstName,
           lastName: data.lastName,
+          tier: data.tier,
+          messageCount: data.messageCount,
+          messageLimit: data.messageLimit,
+          remainingMessages: data.remainingMessages,
         })
       );
     }
@@ -181,7 +193,17 @@ class ApiService {
     return !!localStorage.getItem('token');
   }
 
-  getStoredUser(): { userId?: string; email: string; username: string; firstName: string; lastName: string } | null {
+  getStoredUser(): { 
+    userId?: string; 
+    email: string; 
+    username: string; 
+    firstName: string; 
+    lastName: string;
+    tier?: string;
+    messageCount?: number;
+    messageLimit?: number;
+    remainingMessages?: number;
+  } | null {
     const raw = localStorage.getItem('user');
     return raw ? JSON.parse(raw) : null;
   }
