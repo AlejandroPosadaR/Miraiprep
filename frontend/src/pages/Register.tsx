@@ -5,6 +5,7 @@ import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Sparkles } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -19,6 +20,7 @@ export default function Register() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -44,6 +46,15 @@ export default function Register() {
       toast({
         title: 'Password too short',
         description: 'Password must be at least 6 characters.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!acceptedTerms) {
+      toast({
+        title: 'Terms and Conditions required',
+        description: 'Please accept the Terms and Conditions to continue.',
         variant: 'destructive',
       });
       return;
@@ -240,10 +251,26 @@ export default function Register() {
               </div>
             </div>
 
+            <div className="flex items-start gap-3 p-4 rounded-lg border border-border bg-muted/30">
+              <Checkbox
+                id="terms"
+                checked={acceptedTerms}
+                onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                className="mt-0.5"
+              />
+              <Label htmlFor="terms" className="text-sm cursor-pointer leading-relaxed">
+                I agree to the{' '}
+                <Link to="/terms" className="text-primary hover:underline font-medium">
+                  Terms and Conditions
+                </Link>
+                {' '}and understand that AI-generated content is for practice purposes only.
+              </Label>
+            </div>
+
             <Button
               type="submit"
               className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-              disabled={isLoading}
+              disabled={isLoading || !acceptedTerms}
             >
               {isLoading ? (
                 <div className="flex items-center gap-2">

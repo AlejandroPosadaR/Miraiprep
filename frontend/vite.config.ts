@@ -16,16 +16,17 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-toast'],
-        },
-      },
-    },
+    // Let Vite handle chunking automatically - this ensures React loads before dependencies
+    // Manual chunking was causing "Cannot read properties of undefined" errors
     commonjsOptions: {
       include: [/node_modules/],
+      transformMixedEsModules: true,
     },
+    // Increase chunk size warning limit
+    chunkSizeWarningLimit: 1000,
+    // Use esbuild for minification
+    minify: 'esbuild',
+    // Source maps disabled for production
+    sourcemap: false,
   },
 }));

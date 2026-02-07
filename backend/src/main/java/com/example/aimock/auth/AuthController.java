@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000"})
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
@@ -53,6 +52,10 @@ public class AuthController {
                         .firstName(user.getFirstName())
                         .lastName(user.getLastName())
                         .message("Login successful")
+                        .tier(user.getTier())
+                        .messageCount(user.getMessageCount())
+                        .messageLimit(user.getMessageLimit())
+                        .remainingMessages(user.getRemainingMessages())
                         .build());
             }
             
@@ -100,17 +103,28 @@ public class AuthController {
                         .firstName(user.getFirstName())
                         .lastName(user.getLastName())
                         .message("Registration successful")
+                        .tier(user.getTier())
+                        .messageCount(user.getMessageCount())
+                        .messageLimit(user.getMessageLimit())
+                        .remainingMessages(user.getRemainingMessages())
                         .build());
     }
 
     @GetMapping("/me")
     public ResponseEntity<AuthResponse> getCurrentUser(@AuthenticationPrincipal AuthUser authUser) {
+        User user = userRepository.findById(authUser.getUserId())
+                .orElseThrow(() -> new UnauthorizedException("User not found"));
+        
         return ResponseEntity.ok(AuthResponse.builder()
-                .userId(authUser.getUserId())
-                .email(authUser.getEmail())
-                .username(authUser.getUsername())
-                .firstName(authUser.getFirstName())
-                .lastName(authUser.getLastName())
+                .userId(user.getId())
+                .email(user.getEmail())
+                .username(user.getUsername())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .tier(user.getTier())
+                .messageCount(user.getMessageCount())
+                .messageLimit(user.getMessageLimit())
+                .remainingMessages(user.getRemainingMessages())
                 .build());
     }
 }

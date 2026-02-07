@@ -37,6 +37,8 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // Allow all OPTIONS requests (CORS preflight)
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         // Public endpoints
                         .requestMatchers(
                                 "/api/auth/login",
@@ -68,8 +70,27 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:3000"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        
+        // Build allowed origins list from environment variable or use defaults
+        String allowedOriginsEnv = System.getenv("CORS_ALLOWED_ORIGINS");
+        List<String> allowedOrigins;
+        
+        if (allowedOriginsEnv != null && !allowedOriginsEnv.isEmpty()) {
+            // Parse comma-separated origins from environment variable
+            allowedOrigins = Arrays.asList(allowedOriginsEnv.split(","));
+        } else {
+            // Default: local development origins + production domains
+            allowedOrigins = Arrays.asList(
+                "http://localhost:5173",
+                "http://localhost:3000",
+                "https://miraiprep.com",
+                "http://miraiprep.com",
+                "https://dx4li3mzryciw.cloudfront.net"
+            );
+        }
+        
+        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
         configuration.setExposedHeaders(List.of("Authorization"));

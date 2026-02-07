@@ -17,5 +17,6 @@ public class ErrorResponse {
     private int status;
     private String error;
     private String message;
-    private Map<String, String> details;
+    private String code;
+    private Map<String, ?> details;
 }

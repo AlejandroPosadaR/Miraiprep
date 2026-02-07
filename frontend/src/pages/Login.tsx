@@ -39,10 +39,6 @@ export default function Login() {
 
     try {
       await login(email, password);
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully logged in.",
-      });
       navigate("/dashboard");
     } catch (error) {
       toast({
@@ -114,7 +110,7 @@ export default function Login() {
             className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-3xl shadow-2xl p-8"
           >
             <div className="space-y-2 text-center">
-              <h2 className="text-3xl font-bold tracking-tight text-foreground">Welcome back</h2>
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">Sign in</h2>
               <p className="text-muted-foreground">Sign in to continue your interview preparation</p>
             </div>
 

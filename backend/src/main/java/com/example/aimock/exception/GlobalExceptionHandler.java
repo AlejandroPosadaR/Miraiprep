@@ -65,6 +65,28 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }
 
+    @ExceptionHandler(MessageLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMessageLimitExceeded(MessageLimitExceededException ex) {
+        log.info("Message limit exceeded: tier={}, count={}, limit={}", 
+                ex.getTier(), ex.getMessageCount(), ex.getMessageLimit());
+        
+        Map<String, Object> details = new HashMap<>();
+        details.put("tier", ex.getTier());
+        details.put("messageCount", ex.getMessageCount());
+        details.put("messageLimit", ex.getMessageLimit());
+        details.put("remainingMessages", 0);
+        
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.PAYMENT_REQUIRED.value())
+                .error("Message Limit Exceeded")
+                .message(ex.getMessage())
+                .code("MESSAGE_LIMIT_EXCEEDED")
+                .details(details)
+                .build();
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(error);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();

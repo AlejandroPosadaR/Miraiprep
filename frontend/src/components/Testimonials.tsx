@@ -4,28 +4,28 @@ import { Quote, Star } from "lucide-react";
 const testimonials = [
   {
     name: "Sarah Chen",
-    role: "Software Engineer at Google",
+    // role: "Software Engineer at Google",
     image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face",
     content: "MiraiPrep helped me land my dream job! The AI feedback was incredibly detailed and helped me identify weak spots I didn't even know I had.",
     rating: 5,
   },
   {
     name: "Marcus Johnson",
-    role: "Product Manager at Meta",
+    // role: "Product Manager at Meta",
     image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
     content: "The behavioral interview practice was a game-changer. I went from nervous rambling to confident, structured responses in just two weeks.",
     rating: 5,
   },
   {
     name: "Emily Rodriguez",
-    role: "Data Scientist at Netflix",
+    // role: "Data Scientist at Netflix",
     image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
     content: "I practiced technical interviews daily for a month. The real-time feedback loop is exactly what I needed to sharpen my problem-solving skills.",
     rating: 5,
   },
   {
     name: "David Park",
-    role: "Frontend Developer at Stripe",
+    // role: "Frontend Developer at Stripe",
     image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
     content: "Worth every penny. The mock interviews felt so realistic that my actual interviews seemed easier in comparison!",
     rating: 5,
@@ -93,7 +93,7 @@ export default function Testimonials() {
                   />
                   <div>
                     <h4 className="font-semibold text-foreground">{testimonial.name}</h4>
-                    <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                    {/* <p className="text-sm text-muted-foreground">{testimonial.role}</p> */}
                   </div>
                 </div>
               </div>

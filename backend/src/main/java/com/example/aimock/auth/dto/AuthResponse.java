@@ -19,5 +19,11 @@ public class AuthResponse {
     private String firstName;
     private String lastName;
     private String message;
+    
+    // Message limit info
+    private String tier;
+    private Integer messageCount;
+    private Integer messageLimit;
+    private Integer remainingMessages;
 }
 

@@ -20,6 +20,7 @@ env:
   ECS_CLUSTER: miraiprep-cluster
   ECS_SERVICE_BACKEND: miraiprep-backend-service
   S3_BUCKET_FRONTEND: miraiprep
+  CLOUDFRONT_DOMAIN: dx4li3mzryciw.cloudfront.net
 
 jobs:
   # ============================================
@@ -176,11 +177,68 @@ jobs:
             --service ${{ env.ECS_SERVICE_BACKEND }} \
             --force-new-deployment
 
-      - name: Wait for Backend deployment
+      - name: Check deployment status before wait
         run: |
+          echo "Checking service status before wait..."
+          aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE_BACKEND }} \
+            --query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount,Pending:pendingCount}' \
+            --output table
+          
+          echo ""
+          echo "Recent events:"
+          aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE_BACKEND }} \
+            --query 'services[0].events[0:5].[createdAt,message]' \
+            --output table
+
+      - name: Wait for Backend deployment
+        timeout-minutes: 15
+        run: |
+          echo "Waiting for service to become stable (max 15 minutes)..."
           aws ecs wait services-stable \
             --cluster ${{ env.ECS_CLUSTER }} \
-            --services ${{ env.ECS_SERVICE_BACKEND }}
+            --services ${{ env.ECS_SERVICE_BACKEND }} \
+            --region ${{ env.AWS_REGION }} || {
+              echo "❌ Service did not become stable. Checking status..."
+              aws ecs describe-services \
+                --cluster ${{ env.ECS_CLUSTER }} \
+                --services ${{ env.ECS_SERVICE_BACKEND }} \
+                --region ${{ env.AWS_REGION }} \
+                --query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount,Pending:pendingCount}' \
+                --output table
+              
+              echo ""
+              echo "Recent events:"
+              aws ecs describe-services \
+                --cluster ${{ env.ECS_CLUSTER }} \
+                --services ${{ env.ECS_SERVICE_BACKEND }} \
+                --region ${{ env.AWS_REGION }} \
+                --query 'services[0].events[0:10].[createdAt,message]' \
+                --output table
+              
+              echo ""
+              echo "Task status:"
+              TASK_ARNS=$(aws ecs list-tasks \
+                --cluster ${{ env.ECS_CLUSTER }} \
+                --service-name ${{ env.ECS_SERVICE_BACKEND }} \
+                --region ${{ env.AWS_REGION }} \
+                --query 'taskArns' \
+                --output text 2>/dev/null || echo "")
+              
+              if [ -n "$TASK_ARNS" ] && [ "$TASK_ARNS" != "None" ]; then
+                aws ecs describe-tasks \
+                  --cluster ${{ env.ECS_CLUSTER }} \
+                  --tasks $TASK_ARNS \
+                  --region ${{ env.AWS_REGION }} \
+                  --query 'tasks[*].{Status:lastStatus,Health:healthStatus,StoppedReason:stoppedReason}' \
+                  --output table
+              fi
+              
+              exit 1
+            }
 
       - name: Output deployment URL
         run: |
@@ -196,29 +254,93 @@ jobs:
 
     steps:
       - name: Check Backend health
+        timeout-minutes: 5
         run: |
-          for i in {1..10}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.API_URL }}/actuator/health || echo "000")
+          API_URL="${{ secrets.API_URL }}"
+          if [ -z "$API_URL" ]; then
+            echo "⚠️  API_URL secret not set, skipping health check"
+            exit 0
+          fi
+          
+          # Ensure URL doesn't have trailing slash
+          API_URL="${API_URL%/}"
+          HEALTH_URL="${API_URL}/actuator/health"
+          
+          echo "Checking backend health at: $HEALTH_URL"
+          echo "Waiting for backend to become healthy (max 5 minutes)..."
+          
+          for i in {1..30}; do
+            # Try with both HTTP and HTTPS if needed
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$HEALTH_URL" 2>/dev/null || echo "000")
+            
             if [ "$STATUS" = "200" ]; then
-              echo "✅ Backend is healthy"
+              echo "✅ Backend is healthy (HTTP $STATUS)"
               exit 0
             fi
-            echo "Waiting for backend... (attempt $i/10)"
+            
+            if [ "$STATUS" != "000" ]; then
+              echo "Backend responded with HTTP $STATUS (attempt $i/30)"
+            else
+              echo "Waiting for backend... (attempt $i/30)"
+            fi
+            
             sleep 10
           done
-          echo "❌ Backend health check failed"
+          
+          echo "❌ Backend health check failed after 30 attempts"
+          echo "Last status: $STATUS"
+          echo "Tried URL: $HEALTH_URL"
+          
+          # Try to get more info
+          echo ""
+          echo "Debug info:"
+          curl -v "$HEALTH_URL" 2>&1 | head -20 || echo "Could not connect"
+          
           exit 1
 
       - name: Check Frontend health
         run: |
-          for i in {1..10}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.FRONTEND_URL }} || echo "000")
+          # Use CloudFront distribution domain (works even if custom domain not configured)
+          FRONTEND_URL="${{ secrets.FRONTEND_URL }}"
+          
+          # Prefer custom domain if set, otherwise use CloudFront domain from env
+          if [ -n "$FRONTEND_URL" ] && [ "$FRONTEND_URL" != "" ]; then
+            HEALTH_URL="$FRONTEND_URL"
+            echo "Checking frontend at custom domain: $HEALTH_URL"
+          else
+            HEALTH_URL="https://${{ env.CLOUDFRONT_DOMAIN }}"
+            echo "Checking frontend at CloudFront domain: $HEALTH_URL"
+          fi
+          
+          # Ensure URL doesn't have trailing slash
+          HEALTH_URL="${HEALTH_URL%/}"
+          
+          echo "Waiting for frontend to become healthy (max 2 minutes)..."
+          
+          for i in {1..12}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$HEALTH_URL" 2>/dev/null || echo "000")
+            
             if [ "$STATUS" = "200" ]; then
-              echo "✅ Frontend is healthy"
+              echo "✅ Frontend is healthy (HTTP $STATUS)"
               exit 0
             fi
-            echo "Waiting for frontend... (attempt $i/10)"
+            
+            if [ "$STATUS" != "000" ]; then
+              echo "Frontend responded with HTTP $STATUS (attempt $i/12)"
+            else
+              echo "Waiting for frontend... (attempt $i/12)"
+            fi
+            
             sleep 10
           done
-          echo "❌ Frontend health check failed"
+          
+          echo "❌ Frontend health check failed after 12 attempts"
+          echo "Last status: $STATUS"
+          echo "Tried URL: $HEALTH_URL"
+          
+          # Try to get more info
+          echo ""
+          echo "Debug info:"
+          curl -v "$HEALTH_URL" 2>&1 | head -20 || echo "Could not connect"
+          
           exit 1
