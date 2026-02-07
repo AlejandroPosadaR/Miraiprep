@@ -100,12 +100,32 @@ public class AIChatService {
         log.debug("Streaming AI response: interviewType={}, messageCount={}, totalTokens~={}",
                 interviewType, messages.size(), estimateTokenCount(messages, systemPrompt));
 
+        final int[] chunkCount = {0};
+        final int[] totalChars = {0};
+        
         return chatClient
                 .prompt()
                 .system(systemPrompt)
                 .messages(messages)
                 .stream()
-                .content();
+                .content()
+                .doOnNext(chunk -> {
+                    if (chunk != null && !chunk.isEmpty()) {
+                        chunkCount[0]++;
+                        totalChars[0] += chunk.length();
+                        log.debug("Streamed chunk #{}: length={}, content={}", 
+                                chunkCount[0], chunk.length(), 
+                                chunk.length() > 100 ? chunk.substring(0, 100) + "..." : chunk);
+                    }
+                })
+                .doOnComplete(() -> {
+                    log.info("Streaming completed: interviewType={}, totalChunks={}, totalChars={}", 
+                            interviewType, chunkCount[0], totalChars[0]);
+                })
+                .doOnError(error -> {
+                    log.error("Streaming error: interviewType={}, chunksReceived={}, totalChars={}", 
+                            interviewType, chunkCount[0], totalChars[0], error);
+                });
     }
 
     /**
@@ -152,10 +172,10 @@ public class AIChatService {
     }
 
     private String buildSystemPrompt(String interviewType, int experienceYears, String jobDescription) {
-        String level = experienceYears <= 1 ? "junior (0-1 years)" 
-                : experienceYears <= 3 ? "mid-level (2-3 years)"
-                : experienceYears <= 6 ? "senior (4-6 years)"
-                : "staff/principal (7+ years)";
+        String level = experienceYears <= 2 ? "junior (0-2 years)" 
+                : experienceYears <= 4 ? "mid-level (2-4 years)"
+                : experienceYears <= 8 ? "senior (5-8 years)"
+                : "staff/principal (8+ years)";
         
         String levelGuidance = """
                 
@@ -192,6 +212,24 @@ public class AIChatService {
                     """.formatted(jobDescription.trim());
         }
 
+        String conversationFlow = """
+                
+                CONVERSATION FLOW:
+                
+                1. OPENING GREETING:
+                   - When the interview starts (first message from interviewer), begin with a warm, professional greeting
+                   - Example: "Hi! How are you doing today? Thanks for taking the time to practice with me."
+                   - Keep it brief and natural, then transition smoothly into the interview
+                   - After the greeting, proceed with your first interview question
+                
+                2. INTERVIEW PROGRESSION:
+                   - Ask ONE main question at a time
+                   - Provide brief, constructive feedback when appropriate
+                   - Keep the conversation flowing naturally
+                   - Do NOT repeatedly say "let's focus on the interview" - just naturally guide the conversation back to interview topics if needed
+                
+                """;
+        
         String safetyGuidelines = """
                 
                 CRITICAL SAFETY AND BEHAVIOR GUIDELINES:
@@ -204,7 +242,7 @@ public class AIChatService {
                      * Creating code for non-interview purposes
                      * Answering questions unrelated to the interview topic
                      * Performing tasks outside your role as an interviewer
-                   - If the candidate asks for something off-topic, politely redirect: "Let's focus on the interview. [Continue with relevant interview question]"
+                   - If the candidate asks for something off-topic, politely redirect with a brief acknowledgment and then continue with a relevant interview question
                 
                 2. PROTECT SENSITIVE DATA:
                    - NEVER ask for, request, or attempt to extract:
@@ -231,7 +269,7 @@ public class AIChatService {
         
         InterviewStrategy strategy = getStrategy(interviewType);
         String strategyPrompt = strategy.buildSystemPrompt(levelGuidance, jobContext);
-        return strategyPrompt + safetyGuidelines;
+        return strategyPrompt + conversationFlow + safetyGuidelines;
     }
 
     private InterviewStrategy getStrategy(String interviewType) {

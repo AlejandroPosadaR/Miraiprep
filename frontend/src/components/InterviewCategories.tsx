@@ -1,12 +1,14 @@
 import { motion } from "framer-motion";
 import { Button } from "./ui/button";
-import { Target, Layers, Brain, ArrowUpRight } from "lucide-react";
+import { Target, Layers, Sparkles, MessageSquare, User, Brain, ArrowUpRight } from "lucide-react";
+import { INTERVIEW_TYPES } from "@/constants/interviewTypes";
 
-const categories = [
-  { icon: Target, title: "OOP", description: "Object-oriented programming concepts and principles", count: "200+" },
-  { icon: Layers, title: "Backend", description: "Spring Boot, APIs, databases, and backend architecture", count: "300+" },
-  { icon: Brain, title: "Fullstack", description: "End-to-end system design and implementation", count: "250+" },
-];
+const categories = INTERVIEW_TYPES.map(type => ({
+  icon: type.icon,
+  title: type.title,
+  description: type.description,
+  count: "200+",
+}));
 
 const InterviewCategories = () => {
   return (
