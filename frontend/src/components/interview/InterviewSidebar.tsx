@@ -1,6 +1,9 @@
 import { useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useCamera } from "@/hooks/useCamera";
+import { TTS_VOICES } from "@/constants/ttsVoices";
+import { getExperienceLevelLabel } from "@/constants/experienceLevels";
+import { getInterviewTypeLabel } from "@/constants/interviewLabels";
 import { 
   Brain, 
   Waves, 
@@ -16,15 +19,6 @@ import {
   ChevronRight 
 } from "lucide-react";
 import type { InterviewSession } from "@/services/api";
-
-const TTS_VOICES = [
-  { id: "alloy", name: "Alloy" },
-  { id: "echo", name: "Echo" },
-  { id: "fable", name: "Fable" },
-  { id: "onyx", name: "Onyx" },
-  { id: "nova", name: "Nova" },
-  { id: "shimmer", name: "Shimmer" },
-] as const;
 
 interface InterviewSidebarProps {
   sidebarCollapsed: boolean;
@@ -58,22 +52,8 @@ export function InterviewSidebar({
     }
   }, [camera.stream]);
 
-  const experienceLevelLabel = session?.experienceYears != null
-    ? session.experienceYears <= 1 ? "Entry Level"
-      : session.experienceYears <= 3 ? "Mid Level"
-      : session.experienceYears <= 6 ? "Senior"
-      : "Staff+"
-    : "Mid Level";
-
-  const interviewTypeLabel = session?.interviewType
-    ? session.interviewType === "OOP" ? "OOP Concepts"
-      : session.interviewType === "SPRING_BOOT" ? "Spring Boot"
-      : session.interviewType === "SYSTEM_DESIGN" ? "System Design"
-      : session.interviewType === "JAVASCRIPT_REACT" ? "JavaScript / React"
-      : session.interviewType === "BEHAVIORAL" ? "Behavioral"
-      : session.interviewType === "FULLSTACK" ? "Fullstack"
-      : session.interviewType
-    : "Technical";
+  const experienceLevelLabel = getExperienceLevelLabel(session?.experienceYears);
+  const interviewTypeLabel = getInterviewTypeLabel(session?.interviewType);
 
   return (
     <aside
