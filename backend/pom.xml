@@ -31,7 +31,7 @@
 		<spring-ai.version>1.1.2</spring-ai.version>
 		<aws.sdk.version>2.41.13</aws.sdk.version>
 		<jjwt.version>0.13.0</jjwt.version>
-		<jacoco.version>0.8.12</jacoco.version>
+		<jacoco.version>0.8.14</jacoco.version>
 	</properties>
 	<dependencies>
 		<dependency>
